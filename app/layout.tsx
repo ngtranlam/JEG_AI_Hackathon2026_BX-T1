@@ -1,0 +1,19 @@
+import type { Metadata } from "next";
+import "./globals.css";
+
+export const metadata: Metadata = {
+  title: "AI Video Content Factory",
+  description: "TRAE-orchestrated short-form video production workspace.",
+};
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html lang="en">
+      <body>{children}</body>
+    </html>
+  );
+}

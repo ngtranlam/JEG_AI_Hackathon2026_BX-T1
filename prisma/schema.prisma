@@ -1,0 +1,80 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Project {
+  id               String        @id
+  status           String
+  briefJson        String
+  brandKitJson     String
+  projectStateJson String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  nodeRuns         NodeRun[]
+  artifacts        Artifact[]
+  revisions        Revision[]
+  exportAssets     ExportAsset[]
+}
+
+model NodeRun {
+  id          String   @id @default(cuid())
+  projectId   String
+  nodeId      String
+  status      String
+  startedAt   DateTime?
+  completedAt DateTime?
+  attempts    Int      @default(0)
+  errorText   String?
+  logJson     String   @default("[]")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, nodeId])
+}
+
+model Artifact {
+  id        String   @id @default(cuid())
+  projectId String
+  variantId String?
+  nodeId    String?
+  kind      String
+  label     String
+  path      String
+  metadata  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, variantId])
+}
+
+model Revision {
+  id          String   @id @default(cuid())
+  projectId   String
+  scope       String?
+  instruction String
+  status      String   @default("pending")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model ExportAsset {
+  id        String   @id @default(cuid())
+  projectId String
+  variantId String?
+  type      String
+  label     String
+  path      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, variantId])
+}
