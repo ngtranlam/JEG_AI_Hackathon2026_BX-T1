@@ -1,0 +1,32 @@
+{
+  "brief": {
+    "brandName": "GreenBite",
+    "productName": "Healthy salad delivery",
+    "audience": "Office workers 25-35",
+    "objective": "Drive first orders for lunch delivery",
+    "offer": "Free delivery for first order",
+    "primaryCallToAction": "Order now",
+    "toneOfVoice": "fresh, energetic, trustworthy",
+    "platform": "tiktok",
+    "durationSeconds": 20,
+    "complianceNotes": ["No fast weight-loss claims."],
+    "prohibitedClaims": ["Lose 5kg in 7 days"],
+    "references": ["Clean bright realistic food shots, fast cuts, subtitle-heavy."]
+  },
+  "brandKit": {
+    "primaryColorHex": "#2E7D32",
+    "secondaryColorHex": "#FFFFFF",
+    "fontFamily": "Montserrat",
+    "tagline": "Eat healthy without meal prep",
+    "visualNotes": ["Clean, bright, modern", "Realistic product shots"],
+    "forbiddenWords": ["miracle", "guaranteed"],
+    "assets": [
+      { "type": "logo", "fileName": "logo.png", "filePath": "uploads/logo.png" },
+      {
+        "type": "product-image",
+        "fileName": "product_01.jpg",
+        "filePath": "uploads/product_01.jpg"
+      }
+    ]
+  }
+}

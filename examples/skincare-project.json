@@ -1,0 +1,28 @@
+{
+  "brief": {
+    "brandName": "GlowUp",
+    "productName": "Hydrating serum",
+    "audience": "Skincare beginners, 18-28",
+    "objective": "Increase add-to-cart for the serum",
+    "offer": "Bundle discount this week",
+    "primaryCallToAction": "Tap to shop",
+    "toneOfVoice": "calm, premium, confident",
+    "platform": "instagram-reels",
+    "durationSeconds": 30,
+    "complianceNotes": ["Avoid medical claims.", "Avoid before/after exaggeration."],
+    "prohibitedClaims": ["Cures acne instantly"],
+    "references": ["Macro texture shots, premium lighting, slow motion product demo."]
+  },
+  "brandKit": {
+    "primaryColorHex": "#111827",
+    "secondaryColorHex": "#F59E0B",
+    "fontFamily": "Inter",
+    "tagline": "Hydrate. Glow. Repeat.",
+    "visualNotes": ["Premium", "Minimal", "High contrast"],
+    "forbiddenWords": ["cure", "guarantee"],
+    "assets": [
+      { "type": "logo", "fileName": "logo.png", "filePath": "uploads/logo.png" },
+      { "type": "product-image", "fileName": "serum.jpg", "filePath": "uploads/serum.jpg" }
+    ]
+  }
+}

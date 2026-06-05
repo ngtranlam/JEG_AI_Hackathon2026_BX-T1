@@ -105,3 +105,83 @@ Each brief must produce at least two measurable creative directions for A/B test
 ## 📦 Repository Goal
 
 This repository is intended to host the BX-T1 workflow, assets, automation logic, and reusable orchestration templates for the hackathon submission sponsored by BytePlus and TRAE.
+
+## 🚦 Quick Start (Local)
+
+### Prerequisites
+
+- Node.js 20+
+- Redis (for BullMQ)
+- FFmpeg (required later for the media pipeline)
+
+### Setup
+
+```bash
+npm install
+cp .env.example .env
+npx prisma generate
+npx prisma migrate dev
+```
+
+### Run (3 terminals)
+
+Terminal 1: Redis
+
+```bash
+redis-server
+```
+
+Terminal 2: Worker (BullMQ consumer)
+
+```bash
+npm run worker
+```
+
+Terminal 3: Web app
+
+```bash
+npm run dev
+```
+
+Open: http://localhost:3000
+
+### Demo Flow (MVP)
+
+1. Choose an example preset (F&B or Skincare).
+2. Click "Create project".
+3. Click "Enqueue generation".
+4. Watch node-by-node status updates and logs.
+5. Review Variant A/B strategy + selected hook + script beats.
+
+## 🧪 API Smoke Test
+
+Create a project:
+
+```bash
+curl -sS -X POST http://localhost:3000/api/projects \\
+  -H 'content-type: application/json' \\
+  -d @examples/fnb-project.json | jq
+```
+
+Enqueue generation:
+
+```bash
+PROJECT_ID="<replace-with-id>"
+curl -sS -X POST http://localhost:3000/api/projects/$PROJECT_ID/generate | jq
+```
+
+Fetch project state:
+
+```bash
+curl -sS http://localhost:3000/api/projects/$PROJECT_ID | jq
+```
+
+## 🧩 Notes
+
+- Current MVP focuses on visible workflow orchestration and text-planning nodes.
+- Current media pipeline runs in `mock` mode by default, so no provider API key is required yet.
+- Mock mode still creates raw segment, normalized segment, and stitched draft artifacts on local storage.
+- Mock mode now also creates voiceover, ASS subtitle, and final 9:16 placeholder artifacts.
+- Mock mode also generates title, caption, hashtags, cover, and evaluation report placeholders.
+- Mock mode now covers the full 18-node workflow shape, including revision planning and export metadata.
+- Real Seedance 2.0 and FFmpeg execution can be enabled later by swapping the provider implementation.

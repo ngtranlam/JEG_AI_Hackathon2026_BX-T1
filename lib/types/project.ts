@@ -60,6 +60,7 @@ export interface BrandAsset {
   fileName: string;
   filePath: string;
   mimeType?: string;
+  publicUrl?: string;
 }
 
 export interface BrandKit {
@@ -120,6 +121,13 @@ export interface SegmentPlan {
   order: number;
   durationSeconds: number;
   purpose: string;
+  generationMode?: "T2V" | "I2V" | "R2V";
+  needsProductReference?: boolean;
+  sourceScene?: string;
+  seedanceTaskId?: string;
+  rawVideoPath?: string;
+  normalizedVideoPath?: string;
+  status?: "pending" | "generating" | "completed" | "failed";
   promptSummary?: string;
 }
 
@@ -149,7 +157,13 @@ export interface Variant {
   storyboard?: StoryboardFrame[];
   segmentPlan?: SegmentPlan[];
   artifacts: VariantArtifact[];
+  generatedTitle?: string;
+  generatedCaption?: string;
+  generatedHashtags?: string[];
   score?: VariantScoreBreakdown;
+  publishable?: boolean;
+  evaluationSummary?: string;
+  evaluationNotes?: string[];
 }
 
 export interface WorkflowNodeRun {
@@ -169,6 +183,13 @@ export interface ExportAsset {
   path: string;
 }
 
+export interface RevisionAction {
+  target: string;
+  action: string;
+  sceneId?: string;
+  segmentId?: string;
+}
+
 export interface ProjectState {
   projectId: string;
   status: ProjectStatus;
@@ -176,6 +197,7 @@ export interface ProjectState {
   brandKit: BrandKit;
   analysis?: BriefAnalysis;
   brandDna?: BrandDna;
+  revisionPlan?: RevisionAction[];
   variants: Variant[];
   workflowStatus: Record<WorkflowNodeId, WorkflowNodeRun>;
   exports: ExportAsset[];

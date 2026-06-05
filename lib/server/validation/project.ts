@@ -7,6 +7,7 @@ const brandAssetSchema = z.object({
   fileName: z.string().min(1),
   filePath: z.string().min(1),
   mimeType: z.string().min(1).optional(),
+  publicUrl: z.string().min(1).optional(),
 });
 
 export const briefSchema = z.object({

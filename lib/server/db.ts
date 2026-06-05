@@ -4,6 +4,8 @@ const globalForPrisma = globalThis as typeof globalThis & {
   prisma?: PrismaClient;
 };
 
+process.env.DATABASE_URL ||= "file:./prisma/dev.db";
+
 export const prisma =
   globalForPrisma.prisma ??
   new PrismaClient({

@@ -3,6 +3,8 @@ node_modules
 out
 coverage
 *.log
+.DS_Store
+dump.rdb
 .env
 .env.local
 .env.production.local
@@ -11,3 +13,4 @@ coverage
 prisma/dev.db
 prisma/dev.db-journal
 outputs/generated
+public/uploads
