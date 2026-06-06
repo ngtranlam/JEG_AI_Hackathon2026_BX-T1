@@ -179,9 +179,9 @@ curl -sS http://localhost:3000/api/projects/$PROJECT_ID | jq
 ## 🧩 Notes
 
 - Current MVP focuses on visible workflow orchestration and text-planning nodes.
-- Current media pipeline runs in `mock` mode by default, so no provider API key is required yet.
-- Mock mode still creates raw segment, normalized segment, and stitched draft artifacts on local storage.
-- Mock mode now also creates voiceover, ASS subtitle, and final 9:16 placeholder artifacts.
-- Mock mode also generates title, caption, hashtags, cover, and evaluation report placeholders.
-- Mock mode now covers the full 18-node workflow shape, including revision planning and export metadata.
-- Real Seedance 2.0 and FFmpeg execution can be enabled later by swapping the provider implementation.
+- Seedance 2.0 via ModelArk is now wired for real generation when the required env vars are present.
+- ElevenLabs is now wired for real narration voiceover generation when the required env vars are present.
+- FFmpeg now normalizes segments, stitches draft videos, mixes real voiceover audio, burns ASS subtitles, and exports a real 1:1 video cut.
+- Local image upload is supported and can be used as the I2V reference image for Seedance.
+- Remaining placeholder outputs are limited to generated captions/hashtags logic and the workflow report metadata, not the core video/audio pipeline.
+- Seedance may reject uploaded reference images that appear to contain a real person, so product-only or graphic reference images are recommended for stable demo runs.

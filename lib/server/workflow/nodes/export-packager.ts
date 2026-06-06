@@ -1,3 +1,4 @@
+import { createSquareVideo, createVerticalVideo, probeMediaFile } from "@/lib/server/media/ffmpeg";
 import { buildArtifactPath } from "@/lib/server/storage/artifacts";
 import { writeTextArtifact } from "@/lib/server/storage/files";
 import { appendNodeLog } from "@/lib/server/state/project-state";
@@ -8,17 +9,19 @@ import type { WorkflowNode } from "@/lib/server/workflow/nodes/types";
 async function createVariantExportArtifacts(input: {
   projectId: string;
   variantId: string;
-  finalVideoPath?: string;
+  finalVideoPath: string;
+  isSquare: boolean;
   generatedTitle?: string;
   generatedCaption?: string;
   generatedHashtags?: string[];
   score?: number;
 }) {
-  const final1x1Path = buildArtifactPath({
+  const altFileName = input.isSquare ? "final_9x16.mp4" : "final_1x1.mp4";
+  const altPath = buildArtifactPath({
     projectId: input.projectId,
     variantId: input.variantId,
     nodeId: "export-packager",
-    fileName: "final_1x1.mp4",
+    fileName: altFileName,
   });
 
   const promptsPath = buildArtifactPath({
@@ -28,18 +31,11 @@ async function createVariantExportArtifacts(input: {
     fileName: "seedance_prompts.json",
   });
 
-  await writeTextArtifact(
-    final1x1Path,
-    JSON.stringify(
-      {
-        mock: true,
-        sourceFinal9x16: input.finalVideoPath ?? null,
-        profile: "1080x1080 safe crop placeholder",
-      },
-      null,
-      2,
-    ),
-  );
+  if (input.isSquare) {
+    await createVerticalVideo(input.finalVideoPath, altPath);
+  } else {
+    await createSquareVideo(input.finalVideoPath, altPath);
+  }
 
   await writeTextArtifact(
     promptsPath,
@@ -55,7 +51,7 @@ async function createVariantExportArtifacts(input: {
     ),
   );
 
-  return { final1x1Path, promptsPath };
+  return { altPath, promptsPath };
 }
 
 async function createWorkflowReport(projectState: ProjectState) {
@@ -74,8 +70,11 @@ async function createWorkflowReport(projectState: ProjectState) {
     "## Brief Summary",
     `- Brand: ${projectState.brief.brandName}`,
     `- Product: ${projectState.brief.productName}`,
-    `- Objective: ${projectState.brief.objective}`,
-    `- Duration: ${projectState.brief.durationSeconds}s`,
+    `- Objective: ${projectState.brief.objective ?? projectState.brief.mainMessage}`,
+    `- Duration: ${projectState.brief.targetDuration}s`,
+    `- Aspect Ratio: ${projectState.brief.aspectRatio}`,
+    `- Resolution: ${projectState.brief.resolution}`,
+    `- Platforms: ${projectState.brief.platforms.join(", ")}`,
     "",
     "## Variants",
     ...projectState.variants.flatMap((variant) => [
@@ -103,21 +102,32 @@ export const exportPackagerNode: WorkflowNode = {
           (artifact) => artifact.kind === "final-video",
         )?.path;
 
-        const { final1x1Path, promptsPath } = await createVariantExportArtifacts({
+        const isSquare = projectState.brief.aspectRatio === "1:1";
+
+        if (!finalVideoPath || !(await probeMediaFile(finalVideoPath))) {
+          throw new Error(`Variant ${variant.id} is missing a valid final video for export packaging.`);
+        }
+
+        const { altPath, promptsPath } = await createVariantExportArtifacts({
           projectId: projectState.projectId,
           variantId: variant.id,
           finalVideoPath,
+          isSquare,
           generatedTitle: variant.generatedTitle,
           generatedCaption: variant.generatedCaption,
           generatedHashtags: variant.generatedHashtags,
           score: variant.score?.publishableScore,
         });
 
+        const altKind = isSquare ? "final-video-vertical" : "final-video-square";
+        const altLabel = isSquare ? `${variant.id} final 9:16` : `${variant.id} final 1:1`;
+        const altExportType = isSquare ? "video-9x16" : "video-1x1";
+
         const nextArtifacts: VariantArtifact[] = [
           {
-            kind: "final-video-square",
-            label: `${variant.id} final 1:1`,
-            path: final1x1Path,
+            kind: altKind,
+            label: altLabel,
+            path: altPath,
           },
           {
             kind: "prompt-export",
@@ -128,9 +138,9 @@ export const exportPackagerNode: WorkflowNode = {
 
         exportAssets.push(
           {
-            type: "video-1x1",
-            label: `${variant.id} final 1:1`,
-            path: final1x1Path,
+            type: altExportType,
+            label: altLabel,
+            path: altPath,
           },
           {
             type: "prompt-export",
@@ -166,7 +176,7 @@ export const exportPackagerNode: WorkflowNode = {
     return appendNodeLog(
       nextState,
       "export-packager",
-      "Created mock 1:1 exports, prompt export files, and the project workflow report.",
+      `Created alternate-ratio exports (${projectState.brief.aspectRatio === "1:1" ? "9:16 from 1:1" : "1:1 from 9:16"}) from final videos, prompt export files, and the project workflow report.`,
     );
   },
 };

@@ -13,8 +13,11 @@ async function processProjectGeneration(projectId: string) {
     throw new Error(`Project ${projectId} was not found in storage.`);
   }
 
-  const nextState = await runProjectWorkflow(projectRecord.projectState);
-  await updateProjectState(projectId, nextState);
+  await runProjectWorkflow(projectRecord.projectState, {
+    onStateChange: async (nextState) => {
+      await updateProjectState(projectId, nextState);
+    },
+  });
 }
 
 const worker = createProjectGenerationWorker(async (job) => {

@@ -27,7 +27,9 @@ import { subtitleBurnInAgentNode } from "@/lib/server/workflow/nodes/subtitle-bu
 import { videoStitchingAgentNode } from "@/lib/server/workflow/nodes/video-stitching-agent";
 import { voiceoverGeneratorNode } from "@/lib/server/workflow/nodes/voiceover-generator";
 
-import type { WorkflowNode } from "@/lib/server/workflow/nodes/types";
+import type { WorkflowNode, WorkflowNodeContext } from "@/lib/server/workflow/nodes/types";
+
+type WorkflowStateListener = (projectState: ProjectState) => Promise<void> | void;
 
 const ACTIVE_WORKFLOW_NODES: WorkflowNode[] = [
   inputValidatorNode,
@@ -71,27 +73,51 @@ function skipUnimplementedNodes(projectState: ProjectState) {
   }, projectState);
 }
 
-export async function runProjectWorkflow(projectState: ProjectState) {
+export async function runProjectWorkflow(
+  projectState: ProjectState,
+  options?: {
+    onStateChange?: WorkflowStateListener;
+  },
+) {
+  const notifyStateChange = async (state: ProjectState) => {
+    await options?.onStateChange?.(state);
+    return state;
+  };
+
   let nextState = setProjectStatus(projectState, "running");
+  await notifyStateChange(nextState);
 
   for (const node of ACTIVE_WORKFLOW_NODES) {
+    const workflowNodeContext: WorkflowNodeContext = {
+      onStateChange: async (state) => {
+        nextState = state;
+        await notifyStateChange(state);
+      },
+    };
+
     nextState = markNodeRunning(nextState, node.id);
+    await notifyStateChange(nextState);
 
     try {
-      nextState = await node.run(nextState);
+      nextState = await node.run(nextState, workflowNodeContext);
       nextState = markNodeCompleted(nextState, node.id);
+      await notifyStateChange(nextState);
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Unknown workflow node failure.";
 
       nextState = appendNodeLog(nextState, node.id, message);
       nextState = markNodeFailed(nextState, node.id, message);
+      nextState = setProjectStatus(nextState, "failed");
+      await notifyStateChange(nextState);
 
-      return setProjectStatus(nextState, "failed");
+      return nextState;
     }
   }
 
   nextState = skipUnimplementedNodes(nextState);
+  nextState = setProjectStatus(nextState, "completed");
+  await notifyStateChange(nextState);
 
-  return setProjectStatus(nextState, "completed");
+  return nextState;
 }

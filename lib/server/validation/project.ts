@@ -2,6 +2,12 @@ import { z } from "zod";
 
 const durationSchema = z.union([z.literal(15), z.literal(20), z.literal(30)]);
 
+const aspectRatioSchema = z.enum(["9:16", "1:1"]);
+
+const resolutionSchema = z.enum(["720p", "1080p"]);
+
+const platformSchema = z.enum(["TikTok", "Instagram Reels", "YouTube Shorts"]);
+
 const brandAssetSchema = z.object({
   type: z.enum(["logo", "product-image", "moodboard", "reference"]),
   fileName: z.string().min(1),
@@ -13,14 +19,18 @@ const brandAssetSchema = z.object({
 export const briefSchema = z.object({
   brandName: z.string().min(1),
   productName: z.string().min(1),
+  productDescription: z.string().default(""),
   audience: z.string().min(1),
-  objective: z.string().min(1),
+  platforms: z.array(platformSchema).min(1),
+  targetDuration: durationSchema,
+  aspectRatio: aspectRatioSchema,
+  resolution: resolutionSchema.default("720p"),
+  brandTone: z.string().min(1),
+  mainMessage: z.string().default(""),
+  complianceConstraints: z.string().default(""),
+  callToAction: z.string().min(1),
+  objective: z.string().min(1).optional(),
   offer: z.string().min(1).optional(),
-  primaryCallToAction: z.string().min(1),
-  toneOfVoice: z.string().min(1),
-  platform: z.enum(["tiktok", "instagram-reels", "youtube-shorts"]),
-  durationSeconds: durationSchema,
-  complianceNotes: z.array(z.string().min(1)).default([]),
   mandatoryClaims: z.array(z.string().min(1)).optional(),
   prohibitedClaims: z.array(z.string().min(1)).optional(),
   references: z.array(z.string().min(1)).optional(),

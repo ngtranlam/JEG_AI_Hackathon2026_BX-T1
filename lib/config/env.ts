@@ -1,13 +1,29 @@
+import { loadEnvConfig } from "@next/env";
 import { z } from "zod";
 
+loadEnvConfig(process.cwd());
+
 const envSchema = z.object({
+  TEXT_MODEL_PROVIDER: z.enum(["gemini", "modelark"]).default("gemini"),
+  GEMINI_TEXT_MODEL: z.string().min(1).default("gemini-3.5-flash"),
+  GEMINI_ADVANCED_MODEL: z.string().min(1).default("gemini-3.5-flash"),
+  GOOGLE_CLOUD_PROJECT: z.string().min(1).optional(),
+  GOOGLE_CLOUD_LOCATION: z.string().min(1).default("global"),
+  GOOGLE_APPLICATION_CREDENTIALS: z.string().min(1).optional(),
   MODELARK_API_KEY: z.string().min(1).optional(),
   MODELARK_BASE_URL: z.string().url().optional(),
   SEED_MODEL_ID: z.string().min(1).optional(),
   SEEDANCE_MODEL_ID: z.string().min(1).optional(),
-  SEEDANCE_PROVIDER: z.enum(["mock", "modelark"]).default("mock"),
+  SEEDANCE_PROVIDER: z.enum(["mock", "modelark"]).default("modelark"),
+  VOICE_PROVIDER: z.enum(["elevenlabs"]).default("elevenlabs"),
   ELEVENLABS_API_KEY: z.string().min(1).optional(),
   ELEVENLABS_VOICE_ID: z.string().min(1).optional(),
+  ELEVENLABS_MODEL_ID: z.string().min(1).optional(),
+  ELEVENLABS_OUTPUT_FORMAT: z.string().min(1).optional(),
+  ELEVENLABS_STABILITY: z.coerce.number().min(0).max(1).optional(),
+  ELEVENLABS_SIMILARITY_BOOST: z.coerce.number().min(0).max(1).optional(),
+  ELEVENLABS_STYLE: z.coerce.number().min(0).max(1).optional(),
+  ELEVENLABS_USE_SPEAKER_BOOST: z.coerce.boolean().optional(),
   REDIS_URL: z.string().default("redis://localhost:6379"),
   DATABASE_URL: z.string().default("file:./prisma/dev.db"),
   STORAGE_DRIVER: z.enum(["local"]).default("local"),
@@ -16,13 +32,26 @@ const envSchema = z.object({
 });
 
 export const env = envSchema.parse({
+  TEXT_MODEL_PROVIDER: process.env.TEXT_MODEL_PROVIDER,
+  GEMINI_TEXT_MODEL: process.env.GEMINI_TEXT_MODEL,
+  GEMINI_ADVANCED_MODEL: process.env.GEMINI_ADVANCED_MODEL,
+  GOOGLE_CLOUD_PROJECT: process.env.GOOGLE_CLOUD_PROJECT,
+  GOOGLE_CLOUD_LOCATION: process.env.GOOGLE_CLOUD_LOCATION,
+  GOOGLE_APPLICATION_CREDENTIALS: process.env.GOOGLE_APPLICATION_CREDENTIALS,
   MODELARK_API_KEY: process.env.MODELARK_API_KEY,
   MODELARK_BASE_URL: process.env.MODELARK_BASE_URL,
   SEED_MODEL_ID: process.env.SEED_MODEL_ID,
   SEEDANCE_MODEL_ID: process.env.SEEDANCE_MODEL_ID,
   SEEDANCE_PROVIDER: process.env.SEEDANCE_PROVIDER,
+  VOICE_PROVIDER: process.env.VOICE_PROVIDER,
   ELEVENLABS_API_KEY: process.env.ELEVENLABS_API_KEY,
   ELEVENLABS_VOICE_ID: process.env.ELEVENLABS_VOICE_ID,
+  ELEVENLABS_MODEL_ID: process.env.ELEVENLABS_MODEL_ID,
+  ELEVENLABS_OUTPUT_FORMAT: process.env.ELEVENLABS_OUTPUT_FORMAT,
+  ELEVENLABS_STABILITY: process.env.ELEVENLABS_STABILITY,
+  ELEVENLABS_SIMILARITY_BOOST: process.env.ELEVENLABS_SIMILARITY_BOOST,
+  ELEVENLABS_STYLE: process.env.ELEVENLABS_STYLE,
+  ELEVENLABS_USE_SPEAKER_BOOST: process.env.ELEVENLABS_USE_SPEAKER_BOOST,
   REDIS_URL: process.env.REDIS_URL,
   DATABASE_URL: process.env.DATABASE_URL,
   STORAGE_DRIVER: process.env.STORAGE_DRIVER,

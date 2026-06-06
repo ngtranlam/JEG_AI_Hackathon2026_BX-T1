@@ -39,17 +39,33 @@ export const workflowNodeIds = [
 
 export type WorkflowNodeId = (typeof workflowNodeIds)[number];
 
+export const supportedAspectRatios = ["9:16", "1:1"] as const;
+
+export type SupportedAspectRatio = (typeof supportedAspectRatios)[number];
+
+export const supportedResolutions = ["720p", "1080p"] as const;
+
+export type SupportedResolution = (typeof supportedResolutions)[number];
+
+export const supportedPlatforms = ["TikTok", "Instagram Reels", "YouTube Shorts"] as const;
+
+export type SupportedPlatform = (typeof supportedPlatforms)[number];
+
 export interface Brief {
   brandName: string;
   productName: string;
+  productDescription: string;
   audience: string;
-  objective: string;
+  platforms: SupportedPlatform[];
+  targetDuration: SupportedDuration;
+  aspectRatio: SupportedAspectRatio;
+  resolution: SupportedResolution;
+  brandTone: string;
+  mainMessage: string;
+  complianceConstraints: string;
+  callToAction: string;
+  objective?: string;
   offer?: string;
-  primaryCallToAction: string;
-  toneOfVoice: string;
-  platform: "tiktok" | "instagram-reels" | "youtube-shorts";
-  durationSeconds: SupportedDuration;
-  complianceNotes: string[];
   mandatoryClaims?: string[];
   prohibitedClaims?: string[];
   references?: string[];
@@ -79,6 +95,12 @@ export interface BriefAnalysis {
   problemStatement: string;
   platformFitRationale: string;
   campaignObjective: string;
+  painPoints?: string[];
+  desiredEmotion?: string[];
+  mustInclude?: string[];
+  mustAvoid?: string[];
+  platformConventions?: string[];
+  aspectRatioNotes?: string;
 }
 
 export interface BrandDna {
@@ -87,12 +109,26 @@ export interface BrandDna {
   visualAnchors: string[];
   pacingGuidance: string;
   complianceGuardrails: string[];
+  avoidWords?: string[];
+  subtitleGuidance?: {
+    font?: string;
+    position?: string;
+    maxWordsPerLine?: number;
+  };
+  logoGuidance?: {
+    placement?: string;
+    duration?: string;
+  };
 }
 
 export interface CreativeDirection {
   angle: string;
   summary: string;
   differentiators: string[];
+  hypothesis?: string;
+  style?: string;
+  targetEmotion?: string;
+  ctaStrategy?: string;
 }
 
 export interface HookCandidate {
@@ -108,12 +144,36 @@ export interface ScriptBeat {
   intent: string;
 }
 
+export type AudioType = "narration_voiceover" | "character_dialogue" | "no_voice";
+
+export type VoiceProvider = "elevenlabs";
+
+export interface AudioStrategy {
+  audioType: AudioType;
+  requiresLipSync: boolean;
+  provider: VoiceProvider;
+  language: string;
+  voiceIdEnvKey: "ELEVENLABS_VOICE_ID";
+  voiceStyle: string;
+}
+
 export interface StoryboardFrame {
   order: number;
+  sceneId?: string;
+  role?: string;
+  startMs?: number;
+  endMs?: number;
   shotType: string;
   subject: string;
   motion: string;
+  composition?: string;
   notes: string;
+  textOverlay?: string;
+  voiceover?: string;
+  productReferenceRequired?: boolean;
+  audioType?: AudioType;
+  requiresLipSync?: boolean;
+  aspectRatio?: SupportedAspectRatio;
 }
 
 export interface SegmentPlan {
@@ -123,18 +183,27 @@ export interface SegmentPlan {
   purpose: string;
   generationMode?: "T2V" | "I2V" | "R2V";
   needsProductReference?: boolean;
+  referenceImageIds?: string[];
+  aspectRatio?: SupportedAspectRatio;
   sourceScene?: string;
   seedanceTaskId?: string;
   rawVideoPath?: string;
   normalizedVideoPath?: string;
+  lastFrameUrl?: string;
   status?: "pending" | "generating" | "completed" | "failed";
   promptSummary?: string;
+  audioStrategy?: AudioStrategy;
+  dialogueText?: string;
+  dialogueAudioPath?: string;
+  narrationText?: string;
+  seedanceAudioReferencePath?: string;
 }
 
 export interface VariantScoreBreakdown {
   hookStrength: number;
   brandConsistency: number;
   platformFit: number;
+  aspectRatioFit: number;
   subtitleReadability: number;
   visualQuality: number;
   compliance: number;
@@ -164,6 +233,7 @@ export interface Variant {
   publishable?: boolean;
   evaluationSummary?: string;
   evaluationNotes?: string[];
+  audioStrategySummary?: AudioStrategy;
 }
 
 export interface WorkflowNodeRun {

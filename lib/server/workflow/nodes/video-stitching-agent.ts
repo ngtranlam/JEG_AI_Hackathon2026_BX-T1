@@ -1,4 +1,5 @@
 import { buildArtifactPath } from "@/lib/server/storage/artifacts";
+import { concatVideos } from "@/lib/server/media/ffmpeg";
 import { writeTextArtifact } from "@/lib/server/storage/files";
 import { appendNodeLog } from "@/lib/server/state/project-state";
 import type { ProjectState, VariantArtifact } from "@/lib/types/project";
@@ -9,6 +10,7 @@ async function createDraftArtifacts(input: {
   projectId: string;
   variantId: string;
   normalizedVideoPaths: string[];
+  isSquare?: boolean;
 }) {
   const manifestPath = buildArtifactPath({
     projectId: input.projectId,
@@ -21,7 +23,7 @@ async function createDraftArtifacts(input: {
     projectId: input.projectId,
     variantId: input.variantId,
     nodeId: "video-stitching-agent",
-    fileName: `${input.variantId}_draft_9x16.mp4`,
+    fileName: input.isSquare ? `${input.variantId}_draft_1x1.mp4` : `${input.variantId}_draft_9x16.mp4`,
   });
 
   await writeTextArtifact(
@@ -29,18 +31,7 @@ async function createDraftArtifacts(input: {
     input.normalizedVideoPaths.map((filePath) => `file '${filePath}'`).join("\n"),
   );
 
-  await writeTextArtifact(
-    draftVideoPath,
-    JSON.stringify(
-      {
-        mock: true,
-        stitchedFrom: input.normalizedVideoPaths,
-        profile: "concat / hard cuts / 1080x1920 / 30fps",
-      },
-      null,
-      2,
-    ),
-  );
+  await concatVideos(manifestPath, draftVideoPath);
 
   return { manifestPath, draftVideoPath };
 }
@@ -58,12 +49,15 @@ export const videoStitchingAgentNode: WorkflowNode = {
           return variant;
         }
 
+        const isSquare = projectState.brief.aspectRatio === "1:1";
         const { manifestPath, draftVideoPath } = await createDraftArtifacts({
           projectId: projectState.projectId,
           variantId: variant.id,
           normalizedVideoPaths,
+          isSquare,
         });
 
+        const ratioLabel = isSquare ? "1:1" : "9:16";
         const nextArtifacts: VariantArtifact[] = [
           {
             kind: "stitch-manifest",
@@ -72,7 +66,7 @@ export const videoStitchingAgentNode: WorkflowNode = {
           },
           {
             kind: "draft-video",
-            label: `${variant.id} draft 9:16`,
+            label: `${variant.id} draft ${ratioLabel}`,
             path: draftVideoPath,
           },
         ];
@@ -92,7 +86,7 @@ export const videoStitchingAgentNode: WorkflowNode = {
     return appendNodeLog(
       nextState,
       "video-stitching-agent",
-      "Created mock concat manifests and stitched draft video artifacts for both variants.",
+      "Created concat manifests and stitched normalized Seedance segments into draft videos with FFmpeg.",
     );
   },
 };

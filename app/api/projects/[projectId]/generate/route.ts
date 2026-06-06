@@ -26,6 +26,19 @@ export async function POST(_: Request, context: RouteContext) {
     );
   }
 
+  if (
+    projectRecord.projectState.status === "queued" ||
+    projectRecord.projectState.status === "running"
+  ) {
+    return NextResponse.json(
+      {
+        error: "Project generation is already queued or running.",
+        project: projectRecord.projectState,
+      },
+      { status: 409 },
+    );
+  }
+
   const queuedState = setProjectStatus(projectRecord.projectState, "queued");
   await updateProjectState(projectId, queuedState);
 

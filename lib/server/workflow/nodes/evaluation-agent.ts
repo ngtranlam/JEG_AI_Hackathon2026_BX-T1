@@ -1,12 +1,14 @@
 import { buildArtifactPath } from "@/lib/server/storage/artifacts";
 import { writeTextArtifact } from "@/lib/server/storage/files";
 import { appendNodeLog } from "@/lib/server/state/project-state";
+import { formatGeminiFallbackLog } from "@/lib/server/text/gemini-error";
+import { getConfiguredGeminiAdvancedModel, generateStructuredJsonWithGemini } from "@/lib/server/text/gemini";
 import type {
   ProjectState,
-  Variant,
   VariantArtifact,
   VariantScoreBreakdown,
 } from "@/lib/types/project";
+import { z } from "zod";
 
 import type { WorkflowNode } from "@/lib/server/workflow/nodes/types";
 
@@ -14,71 +16,84 @@ function clampScore(value: number) {
   return Math.max(0, Math.min(100, Math.round(value)));
 }
 
-function computeScores(projectState: ProjectState, variant: Variant): VariantScoreBreakdown {
-  const hookStrength = clampScore((variant.selectedHook?.score ?? 72) * 0.9 + 10);
-  const brandConsistency = clampScore(
-    70 +
-      (projectState.brandDna?.visualAnchors.length ?? 0) * 3 +
-      (projectState.brandKit.forbiddenWords?.length ? 5 : 0),
-  );
-  const platformFit = clampScore(
-    72 +
-      (projectState.brief.durationSeconds <= 20 ? 8 : 4) +
-      ((variant.segmentPlan?.length ?? 0) >= 3 ? 6 : 0),
-  );
-  const subtitleReadability = clampScore(
-    78 + ((variant.script?.length ?? 0) > 0 ? 8 : 0) + (projectState.brandKit.fontFamily ? 4 : 0),
-  );
-  const visualQuality = clampScore(
-    74 + ((variant.storyboard?.length ?? 0) > 0 ? 6 : 0) + ((variant.segmentPlan?.length ?? 0) > 0 ? 6 : 0),
-  );
+const evaluationResponseSchema = z.object({
+  variantId: z.enum(["A", "B"]),
+  scores: z.object({
+    hookStrength: z.number().int().min(0).max(100),
+    brandConsistency: z.number().int().min(0).max(100),
+    platformFit: z.number().int().min(0).max(100),
+    aspectRatioFit: z.number().int().min(0).max(100),
+    subtitleReadability: z.number().int().min(0).max(100),
+    visualQuality: z.number().int().min(0).max(100),
+    compliance: z.number().int().min(0).max(100),
+  }),
+  notes: z.array(z.string()).default([]),
+});
 
-  const forbiddenClaims = projectState.brief.prohibitedClaims ?? [];
-  const scriptText = (variant.script ?? []).map((beat) => beat.narration).join(" ").toLowerCase();
-  const containsForbiddenClaim = forbiddenClaims.some((claim) =>
-    scriptText.includes(claim.toLowerCase()),
-  );
-  const compliance = containsForbiddenClaim ? 55 : 100;
+const evaluationResponseJsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["variantId", "scores", "notes"],
+  properties: {
+    variantId: { type: "string", enum: ["A", "B"] },
+    scores: {
+      type: "object",
+      additionalProperties: false,
+      required: [
+        "hookStrength",
+        "brandConsistency",
+        "platformFit",
+        "aspectRatioFit",
+        "subtitleReadability",
+        "visualQuality",
+        "compliance",
+      ],
+      properties: {
+        hookStrength: { type: "integer" },
+        brandConsistency: { type: "integer" },
+        platformFit: { type: "integer" },
+        aspectRatioFit: { type: "integer" },
+        subtitleReadability: { type: "integer" },
+        visualQuality: { type: "integer" },
+        compliance: { type: "integer" },
+      },
+    },
+    notes: { type: "array", items: { type: "string" } },
+  },
+} as const;
 
-  const publishableScore = clampScore(
-    hookStrength * 0.2 +
-      brandConsistency * 0.2 +
-      platformFit * 0.2 +
-      subtitleReadability * 0.15 +
-      visualQuality * 0.15 +
-      compliance * 0.1,
+function computePublishableScore(score: Omit<VariantScoreBreakdown, "publishableScore">) {
+  return clampScore(
+    score.hookStrength * 0.15 +
+      score.brandConsistency * 0.15 +
+      score.platformFit * 0.15 +
+      score.aspectRatioFit * 0.15 +
+      score.subtitleReadability * 0.15 +
+      score.visualQuality * 0.15 +
+      score.compliance * 0.1,
   );
-
-  return {
-    hookStrength,
-    brandConsistency,
-    platformFit,
-    subtitleReadability,
-    visualQuality,
-    compliance,
-    publishableScore,
-  };
 }
 
-function buildEvaluationNotes(variant: Variant, score: VariantScoreBreakdown) {
-  const notes: string[] = [];
-
-  notes.push(`Strongest area: hook strength at ${score.hookStrength}.`);
-  notes.push(
-    score.publishableScore >= 80
-      ? "Ready for editor review with minor polish."
-      : "Needs another revision pass before it is publish-ready.",
-  );
-
-  if ((variant.segmentPlan?.length ?? 0) < 3) {
-    notes.push("Consider adding more segment pacing detail for stronger short-form rhythm.");
-  }
-
-  if (score.compliance < 60) {
-    notes.push("Compliance risk detected. Rewrite claims before publishing.");
-  }
-
-  return notes;
+function buildEvaluationPrompt(projectState: ProjectState, variantId: "A" | "B") {
+  const variant = projectState.variants.find((item) => item.id === variantId);
+  return [
+    "Evaluate this short-form video variant for publish readiness.",
+    "Return valid JSON only. Do not include markdown. Do not include explanations.",
+    "Score the variant from 0 to 100 for hookStrength, brandConsistency, platformFit, aspectRatioFit, subtitleReadability, visualQuality, and compliance.",
+    "Base the judgment on the planning artifacts and generated metadata. Give concise notes with strengths or fixes.",
+    "",
+    "Input JSON:",
+    JSON.stringify(
+      {
+        variantId,
+        brief: projectState.brief,
+        brandDna: projectState.brandDna,
+        variant,
+      },
+      null,
+      2,
+    ),
+  ].join("\n");
 }
 
 async function createEvaluationArtifact(input: {
@@ -114,10 +129,71 @@ async function createEvaluationArtifact(input: {
 export const evaluationAgentNode: WorkflowNode = {
   id: "evaluation-agent",
   async run(projectState: ProjectState) {
+    let usedGemini = false;
+    let model: string | undefined;
+    let fallbackReason: unknown;
+    let evaluationByVariant = new Map<
+      "A" | "B",
+      {
+        variantId: "A" | "B";
+        scores: {
+          hookStrength: number;
+          brandConsistency: number;
+          platformFit: number;
+          aspectRatioFit: number;
+          subtitleReadability: number;
+          visualQuality: number;
+          compliance: number;
+        };
+        notes?: string[];
+      }
+    >();
+
+    try {
+      const generatedEvaluations = await Promise.all(
+        (["A", "B"] as const).map((variantId) =>
+          generateStructuredJsonWithGemini({
+            systemPrompt:
+              "You are a creative QA reviewer for performance marketing videos. Return evaluation scores and notes in valid JSON.",
+            userPrompt: buildEvaluationPrompt(projectState, variantId),
+            validator: evaluationResponseSchema,
+            responseJsonSchema: evaluationResponseJsonSchema,
+            model: getConfiguredGeminiAdvancedModel(),
+          }),
+        ),
+      );
+      usedGemini = true;
+      model = generatedEvaluations[0]?.model;
+      evaluationByVariant = new Map(
+        generatedEvaluations.map((result) => [result.json.variantId, result.json]),
+      );
+    } catch (error) {
+      fallbackReason = error;
+    }
+
     const nextVariants = await Promise.all(
       projectState.variants.map(async (variant) => {
-        const score = computeScores(projectState, variant);
-        const notes = buildEvaluationNotes(variant, score);
+        const generated = evaluationByVariant.get(variant.id as "A" | "B");
+        const partialScore = {
+          hookStrength: clampScore(generated?.scores.hookStrength ?? 70),
+          brandConsistency: clampScore(generated?.scores.brandConsistency ?? 70),
+          platformFit: clampScore(generated?.scores.platformFit ?? 70),
+          aspectRatioFit: clampScore(generated?.scores.aspectRatioFit ?? 70),
+          subtitleReadability: clampScore(generated?.scores.subtitleReadability ?? 70),
+          visualQuality: clampScore(generated?.scores.visualQuality ?? 70),
+          compliance: clampScore(generated?.scores.compliance ?? 70),
+        };
+        const score: VariantScoreBreakdown = {
+          ...partialScore,
+          publishableScore: computePublishableScore(partialScore),
+        };
+        const notes = generated?.notes?.length
+          ? generated.notes
+          : [
+              score.publishableScore >= 80
+                ? "Ready for editor review with minor polish."
+                : "Needs another revision pass before it is publish-ready.",
+            ];
         const evaluationPath = await createEvaluationArtifact({
           projectId: projectState.projectId,
           variantId: variant.id,
@@ -155,7 +231,9 @@ export const evaluationAgentNode: WorkflowNode = {
     return appendNodeLog(
       nextState,
       "evaluation-agent",
-      "Scored both variants against the publishable rubric and saved evaluation reports.",
+      usedGemini
+        ? `Scored both variants with Gemini evaluation and saved evaluation reports (${model}).`
+        : formatGeminiFallbackLog("evaluation-agent", fallbackReason),
     );
   },
 };

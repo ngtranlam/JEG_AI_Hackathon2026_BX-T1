@@ -8,7 +8,7 @@ Use this index to load the right skill file for the current task.
 01_business_understanding.md
 02_creative_strategy.md
 03_hook_script_storyboard.md
-04_brand_consistency.md
+04_brand_consistency.md`
 ```
 
 ## Technical workflow skills

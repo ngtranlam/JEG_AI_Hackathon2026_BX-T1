@@ -1,7 +1,7 @@
 import { buildArtifactPath } from "@/lib/server/storage/artifacts";
-import { writeTextArtifact } from "@/lib/server/storage/files";
+import { normalizeVerticalVideo, normalizeSquareVideo } from "@/lib/server/media/ffmpeg";
 import { appendNodeLog } from "@/lib/server/state/project-state";
-import type { ProjectState, VariantArtifact } from "@/lib/types/project";
+import type { ProjectState, SupportedAspectRatio, SupportedResolution, VariantArtifact } from "@/lib/types/project";
 
 import type { WorkflowNode } from "@/lib/server/workflow/nodes/types";
 
@@ -10,6 +10,8 @@ async function createNormalizedArtifact(input: {
   variantId: string;
   segmentId: string;
   rawVideoPath: string;
+  aspectRatio: SupportedAspectRatio;
+  resolution: SupportedResolution;
 }) {
   const normalizedVideoPath = buildArtifactPath({
     projectId: input.projectId,
@@ -18,19 +20,11 @@ async function createNormalizedArtifact(input: {
     fileName: `${input.segmentId}_norm.mp4`,
   });
 
-  await writeTextArtifact(
-    normalizedVideoPath,
-    JSON.stringify(
-      {
-        mock: true,
-        source: input.rawVideoPath,
-        normalized: true,
-        ffmpegProfile: "1080x1920 / 30fps / H.264 / yuv420p / no-audio",
-      },
-      null,
-      2,
-    ),
-  );
+  if (input.aspectRatio === "1:1") {
+    await normalizeSquareVideo(input.rawVideoPath, normalizedVideoPath, input.resolution);
+  } else {
+    await normalizeVerticalVideo(input.rawVideoPath, normalizedVideoPath, input.resolution);
+  }
 
   return normalizedVideoPath;
 }
@@ -38,6 +32,9 @@ async function createNormalizedArtifact(input: {
 export const segmentNormalizerNode: WorkflowNode = {
   id: "segment-normalizer",
   async run(projectState: ProjectState) {
+    const aspectRatio = projectState.brief.aspectRatio;
+    const resolution = projectState.brief.resolution;
+
     const nextVariants = await Promise.all(
       projectState.variants.map(async (variant) => {
         const nextArtifacts: VariantArtifact[] = [];
@@ -56,6 +53,8 @@ export const segmentNormalizerNode: WorkflowNode = {
               variantId: variant.id,
               segmentId: segment.id,
               rawVideoPath: segment.rawVideoPath,
+              aspectRatio,
+              resolution,
             });
 
             nextArtifacts.push({
@@ -84,10 +83,16 @@ export const segmentNormalizerNode: WorkflowNode = {
       variants: nextVariants,
     };
 
+    const dimMap: Record<string, Record<string, string>> = {
+      "9:16": { "720p": "720x1280", "1080p": "1080x1920" },
+      "1:1": { "720p": "720x720", "1080p": "1080x1080" },
+    };
+    const dims = dimMap[aspectRatio]?.[resolution] ?? "1080x1920";
+
     return appendNodeLog(
       nextState,
       "segment-normalizer",
-      "Created mock normalized segment artifacts using the planned FFmpeg profile.",
+      `Normalized Seedance segment videos to ${dims} (${resolution}) / 30fps / H.264 using FFmpeg.`,
     );
   },
 };

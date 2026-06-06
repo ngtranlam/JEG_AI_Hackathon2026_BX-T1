@@ -1,4 +1,5 @@
 import { buildArtifactPath } from "@/lib/server/storage/artifacts";
+import { burnAssSubtitles, probeMediaFile } from "@/lib/server/media/ffmpeg";
 import { writeTextArtifact } from "@/lib/server/storage/files";
 import { appendNodeLog } from "@/lib/server/state/project-state";
 import type { ProjectState, VariantArtifact } from "@/lib/types/project";
@@ -27,6 +28,12 @@ function escapeAssText(value: string) {
 function buildAssSubtitle(projectState: ProjectState, variantId: string) {
   const variant = projectState.variants.find((item) => item.id === variantId);
   const fontName = projectState.brandKit.fontFamily ?? "Arial";
+  const isSquare = projectState.brief.aspectRatio === "1:1";
+  const is720 = projectState.brief.resolution === "720p";
+  const playResX = is720 ? 720 : 1080;
+  const playResY = isSquare ? playResX : (is720 ? 1280 : 1920);
+  const fontSize = isSquare ? (is720 ? 36 : 52) : (is720 ? 44 : 64);
+  const marginV = isSquare ? (is720 ? 80 : 120) : (is720 ? 150 : 220);
   const dialogue = (variant?.script ?? [])
     .map(
       (beat) =>
@@ -38,12 +45,12 @@ function buildAssSubtitle(projectState: ProjectState, variantId: string) {
 
   return `[Script Info]
 ScriptType: v4.00+
-PlayResX: 1080
-PlayResY: 1920
+PlayResX: ${playResX}
+PlayResY: ${playResY}
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,${fontName},64,&H00FFFFFF,&H00000000,&H66000000,1,0,0,0,100,100,0,0,1,3,1,2,60,60,220,1
+Style: Default,${fontName},${fontSize},&H00FFFFFF,&H00000000,&H66000000,1,0,0,0,100,100,0,0,1,3,1,2,60,60,${marginV},1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -55,8 +62,8 @@ async function createSubtitleArtifacts(input: {
   projectId: string;
   variantId: string;
   assSubtitle: string;
-  draftVideoPath?: string;
-  voiceoverPath?: string;
+  sourceVideoPath?: string;
+  isSquare?: boolean;
 }) {
   const subtitlePath = buildArtifactPath({
     projectId: input.projectId,
@@ -69,24 +76,16 @@ async function createSubtitleArtifacts(input: {
     projectId: input.projectId,
     variantId: input.variantId,
     nodeId: "subtitle-burn-in-agent",
-    fileName: "final_9x16.mp4",
+    fileName: input.isSquare ? "final_1x1.mp4" : "final_9x16.mp4",
   });
 
   await writeTextArtifact(subtitlePath, input.assSubtitle);
-  await writeTextArtifact(
-    finalVideoPath,
-    JSON.stringify(
-      {
-        mock: true,
-        sourceDraft: input.draftVideoPath ?? null,
-        voiceover: input.voiceoverPath ?? null,
-        subtitle: subtitlePath,
-        output: "final_9x16",
-      },
-      null,
-      2,
-    ),
-  );
+
+  if (!input.sourceVideoPath) {
+    throw new Error("Source video is required before subtitle burn-in.");
+  }
+
+  await burnAssSubtitles(input.sourceVideoPath, subtitlePath, finalVideoPath);
 
   return { subtitlePath, finalVideoPath };
 }
@@ -97,21 +96,30 @@ export const subtitleBurnInAgentNode: WorkflowNode = {
     const nextVariants = await Promise.all(
       projectState.variants.map(async (variant) => {
         const assSubtitle = buildAssSubtitle(projectState, variant.id);
+        const mixedVideoPath = variant.artifacts.find(
+          (artifact) => artifact.kind === "voiceover-mixed-video",
+        )?.path;
         const draftVideoPath = variant.artifacts.find(
           (artifact) => artifact.kind === "draft-video",
         )?.path;
-        const voiceoverPath = variant.artifacts.find(
-          (artifact) => artifact.kind === "voiceover-audio",
-        )?.path;
 
+        const usableSourceVideoPath =
+          mixedVideoPath && (await probeMediaFile(mixedVideoPath))
+            ? mixedVideoPath
+            : draftVideoPath && (await probeMediaFile(draftVideoPath))
+              ? draftVideoPath
+              : undefined;
+
+        const isSquare = projectState.brief.aspectRatio === "1:1";
         const { subtitlePath, finalVideoPath } = await createSubtitleArtifacts({
           projectId: projectState.projectId,
           variantId: variant.id,
           assSubtitle,
-          draftVideoPath,
-          voiceoverPath,
+          sourceVideoPath: usableSourceVideoPath,
+          isSquare,
         });
 
+        const ratioLabel = isSquare ? "1:1" : "9:16";
         const nextArtifacts: VariantArtifact[] = [
           {
             kind: "subtitle-file",
@@ -120,7 +128,7 @@ export const subtitleBurnInAgentNode: WorkflowNode = {
           },
           {
             kind: "final-video",
-            label: `${variant.id} final 9:16`,
+            label: `${variant.id} final ${ratioLabel}`,
             path: finalVideoPath,
           },
         ];
@@ -140,7 +148,7 @@ export const subtitleBurnInAgentNode: WorkflowNode = {
     return appendNodeLog(
       nextState,
       "subtitle-burn-in-agent",
-      "Created mock ASS subtitle files and final 9:16 video artifacts for both variants.",
+      "Created ASS subtitle files and burned subtitles into the voiceover-mixed video when available, otherwise the silent draft video.",
     );
   },
 };

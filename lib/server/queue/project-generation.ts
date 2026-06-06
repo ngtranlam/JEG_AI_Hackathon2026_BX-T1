@@ -46,7 +46,7 @@ export async function enqueueProjectGeneration(input: ProjectGenerationJobData) 
   const queue = getProjectGenerationQueue();
 
   return queue.add(PROJECT_GENERATION_JOB_NAME, input, {
-    jobId: `${input.projectId}-${Date.now()}`,
+    jobId: input.projectId,
   });
 }
 
