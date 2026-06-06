@@ -63,7 +63,7 @@ export interface Brief {
   brandTone: string;
   mainMessage: string;
   complianceConstraints: string;
-  callToAction: string;
+  callToAction?: string;
   objective?: string;
   offer?: string;
   mandatoryClaims?: string[];

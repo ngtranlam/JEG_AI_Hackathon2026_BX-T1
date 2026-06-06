@@ -171,7 +171,7 @@ export const scriptWriterNode: WorkflowNode = {
               hook: variant.selectedHook?.text ?? `Discover ${projectState.brief.productName}.`,
               productName: projectState.brief.productName,
               offer: projectState.brief.offer,
-              cta: projectState.brief.callToAction,
+              cta: projectState.brief.callToAction ?? "",
               variantId,
             }),
           ];

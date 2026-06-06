@@ -85,139 +85,144 @@ async function createVoiceoverArtifact(input: {
   return { voiceoverPath, requestPath, strategyPath, mixPlanPath, mixedVideoPath };
 }
 
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export const voiceoverGeneratorNode: WorkflowNode = {
   id: "voiceover-generator",
   async run(projectState: ProjectState) {
-    const nextVariants = await Promise.all(
-      projectState.variants.map(async (variant) => {
-        const script = buildVoiceScript(projectState, variant.id);
-        const { voiceoverPath, requestPath, strategyPath, mixPlanPath, mixedVideoPath } =
-          await createVoiceoverArtifact({
-            projectId: projectState.projectId,
-            variantId: variant.id,
-          });
-        const strategyPayload = buildAudioStrategyPayload(projectState, variant.id);
-        const voiceId = strategyPayload.voiceId;
-        const draftVideoPath = getDraftVideoPath(projectState, variant.id);
+    const nextVariants: typeof projectState.variants = [];
+    for (let vi = 0; vi < projectState.variants.length; vi++) {
+      if (vi > 0) await sleep(3000);
+      const variant = projectState.variants[vi];
+      const script = buildVoiceScript(projectState, variant.id);
+      const { voiceoverPath, requestPath, strategyPath, mixPlanPath, mixedVideoPath } =
+        await createVoiceoverArtifact({
+          projectId: projectState.projectId,
+          variantId: variant.id,
+        });
+      const strategyPayload = buildAudioStrategyPayload(projectState, variant.id);
+      const voiceId = strategyPayload.voiceId;
+      const draftVideoPath = getDraftVideoPath(projectState, variant.id);
 
-        await writeTextArtifact(strategyPath, JSON.stringify(strategyPayload, null, 2));
-        await writeTextArtifact(
-          requestPath,
-          JSON.stringify(
-            {
-              provider: "elevenlabs",
-              text: script,
-              language: "vi-VN",
-              voiceId,
-              modelId: getConfiguredElevenLabsModelId(),
-              outputFormat: "mp3_44100_128",
-              voiceStyle: projectState.brief.brandTone,
-              outputPath: voiceoverPath,
-            },
-            null,
-            2,
-          ),
-        );
-        await writeTextArtifact(
-          mixPlanPath,
-          JSON.stringify(
-            {
-              provider: "ffmpeg",
-              mode: "voiceover_mix",
-              draftVideoArtifactKind: "draft-video",
-              voiceoverArtifactKind: "voiceover-audio",
-              outputPath: mixedVideoPath,
-              nextStep: "mix_voiceover_then_burn_subtitles",
-            },
-            null,
-            2,
-          ),
-        );
-        if (hasElevenLabsRuntimeConfig()) {
-          await generateVoiceoverWithElevenLabs({
-            projectId: projectState.projectId,
-            variantId: variant.id,
+      await writeTextArtifact(strategyPath, JSON.stringify(strategyPayload, null, 2));
+      await writeTextArtifact(
+        requestPath,
+        JSON.stringify(
+          {
+            provider: "elevenlabs",
             text: script,
             language: "vi-VN",
             voiceId,
+            modelId: getConfiguredElevenLabsModelId(),
+            outputFormat: "mp3_44100_128",
             voiceStyle: projectState.brief.brandTone,
             outputPath: voiceoverPath,
-          });
-        } else {
-          await writeTextArtifact(
-            voiceoverPath,
-            JSON.stringify(
+          },
+          null,
+          2,
+        ),
+      );
+      await writeTextArtifact(
+        mixPlanPath,
+        JSON.stringify(
+          {
+            provider: "ffmpeg",
+            mode: "voiceover_mix",
+            draftVideoArtifactKind: "draft-video",
+            voiceoverArtifactKind: "voiceover-audio",
+            outputPath: mixedVideoPath,
+            nextStep: "mix_voiceover_then_burn_subtitles",
+          },
+          null,
+          2,
+        ),
+      );
+      if (hasElevenLabsRuntimeConfig()) {
+        await generateVoiceoverWithElevenLabs({
+          projectId: projectState.projectId,
+          variantId: variant.id,
+          text: script,
+          language: "vi-VN",
+          voiceId,
+          voiceStyle: projectState.brief.brandTone,
+          outputPath: voiceoverPath,
+        });
+      } else {
+        await writeTextArtifact(
+          voiceoverPath,
+          JSON.stringify(
+            {
+              mock: true,
+              provider: "elevenlabs-scaffold",
+              durationSeconds: projectState.brief.targetDuration,
+              voiceStyle: projectState.brief.brandTone,
+              script,
+              reason: "Missing ElevenLabs runtime config.",
+            },
+            null,
+            2,
+          ),
+        );
+      }
+
+      const canMixVoiceover =
+        Boolean(draftVideoPath) &&
+        (await probeMediaFile(draftVideoPath as string)) &&
+        (await probeMediaFile(voiceoverPath));
+
+      if (canMixVoiceover) {
+        await mixVoiceoverWithVideo(draftVideoPath as string, voiceoverPath, mixedVideoPath);
+      }
+
+      const nextArtifacts: VariantArtifact[] = [
+        {
+          kind: "audio-strategy-plan",
+          label: `${variant.id} audio strategy`,
+          path: strategyPath,
+        },
+        {
+          kind: "audio-mix-plan",
+          label: `${variant.id} audio mix plan`,
+          path: mixPlanPath,
+        },
+        {
+          kind: "voiceover-request",
+          label: `${variant.id} elevenlabs request`,
+          path: requestPath,
+        },
+        {
+          kind: "voiceover-audio",
+          label: `${variant.id} voiceover`,
+          path: voiceoverPath,
+        },
+        ...(canMixVoiceover
+          ? [
               {
-                mock: true,
-                provider: "elevenlabs-scaffold",
-                durationSeconds: projectState.brief.targetDuration,
-                voiceStyle: projectState.brief.brandTone,
-                script,
-                reason: "Missing ElevenLabs runtime config.",
-              },
-              null,
-              2,
-            ),
-          );
-        }
-
-        const canMixVoiceover =
-          Boolean(draftVideoPath) &&
-          (await probeMediaFile(draftVideoPath as string)) &&
-          (await probeMediaFile(voiceoverPath));
-
-        if (canMixVoiceover) {
-          await mixVoiceoverWithVideo(draftVideoPath as string, voiceoverPath, mixedVideoPath);
-        }
-
-        const nextArtifacts: VariantArtifact[] = [
-          {
-            kind: "audio-strategy-plan",
-            label: `${variant.id} audio strategy`,
-            path: strategyPath,
-          },
-          {
-            kind: "audio-mix-plan",
-            label: `${variant.id} audio mix plan`,
-            path: mixPlanPath,
-          },
-          {
-            kind: "voiceover-request",
-            label: `${variant.id} elevenlabs request`,
-            path: requestPath,
-          },
-          {
-            kind: "voiceover-audio",
-            label: `${variant.id} voiceover`,
-            path: voiceoverPath,
-          },
-          ...(canMixVoiceover
-            ? [
-                {
-                  kind: "voiceover-mixed-video",
-                  label: `${variant.id} draft with voiceover`,
-                  path: mixedVideoPath,
-                } satisfies VariantArtifact,
-              ]
-            : []),
-        ];
-        const audioStrategySummary: AudioStrategy =
-          variant.segmentPlan?.[0]?.audioStrategy ?? {
-            audioType: "narration_voiceover",
-            requiresLipSync: false,
-            provider: "elevenlabs",
-            language: "vi-VN",
-            voiceIdEnvKey: "ELEVENLABS_VOICE_ID",
-            voiceStyle: projectState.brief.brandTone,
-          };
-
-        return {
-          ...variant,
-          audioStrategySummary,
-          artifacts: [...variant.artifacts, ...nextArtifacts],
+                kind: "voiceover-mixed-video",
+                label: `${variant.id} draft with voiceover`,
+                path: mixedVideoPath,
+              } satisfies VariantArtifact,
+            ]
+          : []),
+      ];
+      const audioStrategySummary: AudioStrategy =
+        variant.segmentPlan?.[0]?.audioStrategy ?? {
+          audioType: "narration_voiceover",
+          requiresLipSync: false,
+          provider: "elevenlabs",
+          language: "vi-VN",
+          voiceIdEnvKey: "ELEVENLABS_VOICE_ID",
+          voiceStyle: projectState.brief.brandTone,
         };
-      }),
-    );
+
+      nextVariants.push({
+        ...variant,
+        audioStrategySummary,
+        artifacts: [...variant.artifacts, ...nextArtifacts],
+      });
+    }
 
     const nextState: ProjectState = {
       ...projectState,

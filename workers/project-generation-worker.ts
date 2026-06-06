@@ -5,8 +5,9 @@ import {
   updateProjectState,
 } from "@/lib/server/repositories/project-repository";
 import { runProjectWorkflow } from "@/lib/server/workflow/runner";
+import type { WorkflowNodeId } from "@/lib/types/project";
 
-async function processProjectGeneration(projectId: string) {
+async function processProjectGeneration(projectId: string, startFromNode?: string) {
   const projectRecord = await getProjectRecord(projectId);
 
   if (!projectRecord?.projectState) {
@@ -14,6 +15,7 @@ async function processProjectGeneration(projectId: string) {
   }
 
   await runProjectWorkflow(projectRecord.projectState, {
+    startFromNode: startFromNode as WorkflowNodeId | undefined,
     onStateChange: async (nextState) => {
       await updateProjectState(projectId, nextState);
     },
@@ -21,7 +23,7 @@ async function processProjectGeneration(projectId: string) {
 }
 
 const worker = createProjectGenerationWorker(async (job) => {
-  await processProjectGeneration(job.data.projectId);
+  await processProjectGeneration(job.data.projectId, job.data.startFromNode);
 });
 
 worker.on("ready", () => {

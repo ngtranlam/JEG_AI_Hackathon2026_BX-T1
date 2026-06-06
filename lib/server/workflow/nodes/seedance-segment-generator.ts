@@ -184,8 +184,6 @@ export const seedanceSegmentGeneratorNode: WorkflowNode = {
         );
         await context?.onStateChange?.(nextState);
 
-        const isDialogue = segment.audioStrategy?.audioType === "character_dialogue";
-
         const result = await createSeedanceTask({
           projectId: nextState.projectId,
           variantId: variant.id,
@@ -198,7 +196,7 @@ export const seedanceSegmentGeneratorNode: WorkflowNode = {
             effectiveGenerationMode === "I2V" ? (previousLastFrameUrl ?? referenceImageUrl) : undefined,
           referenceImageUrls:
             effectiveGenerationMode === "R2V" ? referenceImageUrls : undefined,
-          generateAudio: isDialogue,
+          generateAudio: true,
           resolution: nextState.brief.resolution,
         });
 

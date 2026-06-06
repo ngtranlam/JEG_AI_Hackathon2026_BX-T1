@@ -1,3 +1,8 @@
+import { existsSync } from "node:fs";
+import { join } from "node:path";
+
+import sharp from "sharp";
+
 import {
   appendNodeLog,
   patchNodeRun,
@@ -15,6 +20,40 @@ function countProductImages(projectState: ProjectState) {
   return projectState.brandKit.assets.filter(
     (asset) => asset.type === "product-image",
   ).length;
+}
+
+function rgbToHex(r: number, g: number, b: number) {
+  return `#${[r, g, b].map((c) => c.toString(16).padStart(2, "0")).join("").toUpperCase()}`;
+}
+
+async function extractColorsFromLogo(
+  logoPath: string,
+): Promise<{ primary: string; secondary: string } | null> {
+  try {
+    const absolutePath = join(process.cwd(), logoPath);
+    if (!existsSync(absolutePath)) return null;
+
+    const { dominant } = await sharp(absolutePath).stats();
+    const primary = rgbToHex(dominant.r, dominant.g, dominant.b);
+
+    // Get secondary color by resizing and sampling a different region
+    const { data } = await sharp(absolutePath)
+      .resize(2, 2, { fit: "cover" })
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+
+    // Use bottom-right pixel as secondary if different enough
+    const channelsPerPixel = data.length / 4; // 4 pixels in 2x2
+    const pixelOffset = channelsPerPixel >= 3 ? 3 * 3 : 0; // last pixel offset (RGB)
+    const sr = data[pixelOffset] ?? 255;
+    const sg = data[pixelOffset + 1] ?? 255;
+    const sb = data[pixelOffset + 2] ?? 255;
+    const secondary = rgbToHex(sr, sg, sb);
+
+    return { primary, secondary: secondary === primary ? "#FFFFFF" : secondary };
+  } catch {
+    return null;
+  }
 }
 
 export const inputValidatorNode: WorkflowNode = {
@@ -59,9 +98,26 @@ export const inputValidatorNode: WorkflowNode = {
       );
     }
 
-    let nextState = patchNodeRun(projectState, "input-validator", {
-      artifactPaths: [],
-    });
+    // Extract colors from logo if available and no colors set
+    let updatedBrandKit = { ...projectState.brandKit };
+    const logoAsset = projectState.brandKit.assets.find((a) => a.type === "logo");
+    if (logoAsset?.filePath && (!updatedBrandKit.primaryColorHex || !updatedBrandKit.secondaryColorHex)) {
+      const colors = await extractColorsFromLogo(logoAsset.filePath);
+      if (colors) {
+        updatedBrandKit = {
+          ...updatedBrandKit,
+          primaryColorHex: updatedBrandKit.primaryColorHex || colors.primary,
+          secondaryColorHex: updatedBrandKit.secondaryColorHex || colors.secondary,
+        };
+        warnings.push(`Extracted brand colors from logo: primary=${colors.primary}, secondary=${colors.secondary}`);
+      }
+    }
+
+    let nextState = patchNodeRun(
+      { ...projectState, brandKit: updatedBrandKit },
+      "input-validator",
+      { artifactPaths: [] },
+    );
 
     nextState = appendNodeLog(
       nextState,

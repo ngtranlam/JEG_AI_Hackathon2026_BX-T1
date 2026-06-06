@@ -22,97 +22,31 @@ type UploadImageResponse = {
   asset: BrandAsset;
 };
 
-type ExamplePreset = {
-  label: string;
-  payload: CreateProjectPayload;
-};
-
 type AssetSlot = {
   type: BrandAsset["type"];
   title: string;
   hint: string;
 };
 
-const EXAMPLES: ExamplePreset[] = [
-  {
-    label: "F&B (GreenBite)",
-    payload: {
-      brief: {
-        brandName: "GreenBite",
-        productName: "Healthy salad delivery",
-        productDescription: "Fresh, chef-prepared salads delivered to your office within 30 minutes.",
-        audience: "Office workers 25-35",
-        platforms: ["TikTok"],
-        targetDuration: 20,
-        aspectRatio: "9:16",
-        resolution: "720p",
-        brandTone: "fresh, energetic, trustworthy",
-        mainMessage: "Healthy eating made effortless for busy professionals.",
-        complianceConstraints: "No fast weight-loss claims.",
-        callToAction: "Order now",
-        objective: "Drive first orders for lunch delivery",
-        offer: "Free delivery for first order",
-        prohibitedClaims: ["Lose 5kg in 7 days"],
-        references: ["Clean bright realistic food shots, fast cuts, subtitle-heavy."],
-      },
-      brandKit: {
-        primaryColorHex: "#2E7D32",
-        secondaryColorHex: "#FFFFFF",
-        fontFamily: "Montserrat",
-        tagline: "Eat healthy without meal prep",
-        visualNotes: ["Clean, bright, modern", "Realistic product shots"],
-        forbiddenWords: ["miracle", "guaranteed"],
-        assets: [
-          { type: "logo", fileName: "logo.png", filePath: "uploads/logo.png" },
-          {
-            type: "product-image",
-            fileName: "product_01.jpg",
-            filePath: "uploads/product_01.jpg",
-          },
-        ],
-      },
-    },
+const EMPTY_PAYLOAD: CreateProjectPayload = {
+  brief: {
+    brandName: "",
+    productName: "",
+    productDescription: "",
+    audience: "",
+    platforms: [],
+    targetDuration: 15,
+    aspectRatio: "9:16",
+    resolution: "720p",
+    brandTone: "",
+    mainMessage: "",
+    complianceConstraints: "",
+    callToAction: "",
   },
-  {
-    label: "Skincare (GlowUp)",
-    payload: {
-      brief: {
-        brandName: "GlowUp",
-        productName: "Hydrating serum",
-        productDescription: "Lightweight hyaluronic acid serum for deep hydration and a dewy finish.",
-        audience: "Skincare beginners, 18-28",
-        platforms: ["Instagram Reels"],
-        targetDuration: 30,
-        aspectRatio: "9:16",
-        resolution: "720p",
-        brandTone: "calm, premium, confident",
-        mainMessage: "Effortless hydration that fits your routine.",
-        complianceConstraints: "Avoid medical claims. Avoid before/after exaggeration.",
-        callToAction: "Tap to shop",
-        objective: "Increase add-to-cart for the serum",
-        offer: "Bundle discount this week",
-        prohibitedClaims: ["Cures acne instantly"],
-        references: ["Macro texture shots, premium lighting, slow motion product demo."],
-      },
-      brandKit: {
-        primaryColorHex: "#111827",
-        secondaryColorHex: "#F59E0B",
-        fontFamily: "Inter",
-        tagline: "Hydrate. Glow. Repeat.",
-        visualNotes: ["Premium", "Minimal", "High contrast"],
-        forbiddenWords: ["cure", "guarantee"],
-        assets: [
-          { type: "logo", fileName: "logo.png", filePath: "uploads/logo.png" },
-          {
-            type: "product-image",
-            fileName: "serum.jpg",
-            filePath: "uploads/serum.jpg",
-          },
-        ],
-      },
-    },
+  brandKit: {
+    assets: [],
   },
-];
+};
 
 const assetSlots: AssetSlot[] = [
   { type: "logo", title: "Logo", hint: "PNG, JPG or WEBP" },
@@ -205,10 +139,6 @@ function artifactLabel(kind: string) {
   }
 }
 
-function normalizeHexColor(value?: string) {
-  const normalized = value?.trim() ?? "";
-  return /^#[0-9A-Fa-f]{6}$/.test(normalized) ? normalized : "#FFFFFF";
-}
 
 function emptyAsset(type: BrandAsset["type"]): BrandAsset {
   return {
@@ -438,17 +368,7 @@ async function getJson<TResponse>(url: string): Promise<TResponse> {
 }
 
 export function ProjectDemo() {
-  const [selectedExample, setSelectedExample] = React.useState(
-    EXAMPLES[0]?.label ?? "",
-  );
-  const activePreset = React.useMemo(
-    () => EXAMPLES.find((preset) => preset.label === selectedExample) ?? EXAMPLES[0],
-    [selectedExample],
-  );
-
-  const [payload, setPayload] = React.useState<CreateProjectPayload>(
-    activePreset.payload,
-  );
+  const [payload, setPayload] = React.useState<CreateProjectPayload>(EMPTY_PAYLOAD);
   const [project, setProject] = React.useState<ProjectState | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState(false);
@@ -462,10 +382,6 @@ export function ProjectDemo() {
     null,
   );
   const pollFailureCountRef = React.useRef(0);
-
-  React.useEffect(() => {
-    setPayload(activePreset.payload);
-  }, [activePreset]);
 
   const shouldPoll = project?.status === "queued" || project?.status === "running";
   const isProjectActive = shouldPoll;
@@ -541,6 +457,16 @@ export function ProjectDemo() {
     });
   }
 
+  function appendAsset(nextAsset: BrandAsset) {
+    setPayload((prev) => ({
+      ...prev,
+      brandKit: {
+        ...prev.brandKit,
+        assets: [...prev.brandKit.assets, nextAsset],
+      },
+    }));
+  }
+
   async function handleCreateProject() {
     setBusy(true);
     setError(null);
@@ -564,15 +490,73 @@ export function ProjectDemo() {
     setBusy(true);
     setError(null);
 
+    console.log("[handleGenerate] Starting generation for project:", project.projectId);
+
     try {
       const response = await postJson<{ project: ProjectState }>(
         `/api/projects/${project.projectId}/generate`,
         {},
       );
+      console.log("[handleGenerate] Response received:", response);
+      console.log("[handleGenerate] New project state:", response.project);
       setProject(response.project);
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Failed to enqueue generation job.";
+      console.error("[handleGenerate] Error:", err);
+      setError(message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleCancel() {
+    setBusy(true);
+    setError(null);
+
+    try {
+      await fetch("/api/cleanup", { method: "POST" });
+      setProject(null);
+      setError("Generation cancelled. Cache cleared.");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to cancel.";
+      setError(message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleReset() {
+    setBusy(true);
+    setError(null);
+
+    try {
+      await fetch("/api/cleanup", { method: "POST" });
+      setPayload(EMPTY_PAYLOAD);
+      setProject(null);
+      setExpandedNode(null);
+      setError(null);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to reset.";
+      setError(message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleRunFromNode(nodeId: string) {
+    if (!project?.projectId) return;
+    setBusy(true);
+    setError(null);
+
+    try {
+      const response = await postJson<{ project: ProjectState }>(
+        `/api/projects/${project.projectId}/run-from`,
+        { startFromNode: nodeId },
+      );
+      setProject(response.project);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to re-run from node.";
       setError(message);
     } finally {
       setBusy(false);
@@ -619,7 +603,11 @@ export function ProjectDemo() {
         throw new Error(data.error ?? "Failed to upload image.");
       }
 
-      setAssetForType(type, data.asset);
+      if (type === "product-image") {
+        appendAsset(data.asset);
+      } else {
+        setAssetForType(type, data.asset);
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to upload image.";
       setError(message);
@@ -629,789 +617,531 @@ export function ProjectDemo() {
     }
   }
 
-  return (
-    <div className="grid items-start gap-6 xl:grid-cols-[1.08fr_0.92fr]">
-      <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 className="text-xl font-semibold text-slate-900">Project Input</h2>
-            <p className="text-sm text-slate-500">Điền thông tin và tải hình ảnh tham chiếu.</p>
-          </div>
+  const nodeLabels: Record<string, string> = {
+    "input-validator": "Input",
+    "brief-analyzer": "Analyze",
+    "brand-dna-extractor": "Brand DNA",
+    "creative-direction-generator": "Creative Direction",
+    "hook-generator-scorer": "Hook Scoring",
+    "script-writer": "Script",
+    "storyboard-planner": "Storyboard",
+    "segment-planner": "Segment Plan",
+    "seedance-prompt-builder": "Seedance Prompts",
+    "seedance-segment-generator": "Seedance Clips",
+    "segment-normalizer": "Normalize",
+    "video-stitching-agent": "Stitching",
+    "voiceover-generator": "Voiceover",
+    "subtitle-burn-in-agent": "Subtitles",
+    "cover-caption-title-generator": "Cover & Caption",
+    "evaluation-agent": "Evaluation",
+    "editor-revision-router": "Revision",
+    "export-packager": "Export",
+  };
 
-          <label className="flex flex-col gap-1 text-sm text-slate-700">
-            <span className="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
-              Preset
-            </span>
-            <select
-              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-100"
-              value={selectedExample}
-              onChange={(event: React.ChangeEvent<HTMLSelectElement>) =>
-                setSelectedExample(event.target.value)
-              }
-              disabled={busy}
-            >
-              {EXAMPLES.map((preset) => (
-                <option key={preset.label} value={preset.label}>
-                  {preset.label}
-                </option>
-              ))}
-            </select>
-          </label>
+  const inputCls = "w-full rounded-[9px] border border-[#e4e7ef] bg-white px-3 py-[11px] text-sm text-[#111827] outline-none transition placeholder:text-[#a7adbb] focus:border-orange-400 focus:ring-2 focus:ring-orange-100";
+  const labelCls = "text-xs font-semibold text-[#111827] leading-tight";
+
+  return (
+    <div className="grid grid-cols-1 gap-5 xl:grid-cols-[410px_1fr]">
+      {/* ───── LEFT: Input Brief ───── */}
+      <aside className="rounded-2xl border border-[#e4e7ef] bg-white p-[22px] shadow-[0_10px_30px_rgba(15,23,42,0.06)]">
+        <div className="mb-5 flex items-start gap-3">
+          <div className="flex h-[30px] w-[30px] flex-none items-center justify-center rounded-lg bg-orange-50 text-orange-500 text-sm font-extrabold">
+            ✎
+          </div>
+          <div>
+            <h1 className="text-lg font-extrabold text-[#111827]">Input Brief</h1>
+            <p className="mt-1 text-xs text-[#6b7280]">Provide details to generate high-performing videos.</p>
+          </div>
         </div>
 
-        <div className="mt-6 grid gap-4 sm:grid-cols-2">
-          <label className="flex flex-col gap-2 text-sm text-slate-700">
-            <span className="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
-              Brand name
-            </span>
-            <input
-              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-100"
-              value={payload.brief.brandName}
-              onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-                updateBrief("brandName", event.target.value)
-              }
-              disabled={busy}
-            />
-          </label>
+        {/* Brand name */}
+        <div className="mb-3.5 grid grid-cols-[110px_1fr] items-start gap-3">
+          <div className={labelCls} style={{ paddingTop: 11 }}>Brand name</div>
+          <input className={inputCls} value={payload.brief.brandName} onChange={(e) => updateBrief("brandName", e.target.value)} placeholder="e.g. Glowtics" disabled={busy} />
+        </div>
 
-          <label className="flex flex-col gap-2 text-sm text-slate-700">
-            <span className="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
-              Product name
-            </span>
-            <input
-              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-100"
-              value={payload.brief.productName}
-              onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-                updateBrief("productName", event.target.value)
-              }
-              disabled={busy}
-            />
-          </label>
+        {/* Product / service */}
+        <div className="mb-3.5 grid grid-cols-[110px_1fr] items-start gap-3">
+          <div className={labelCls} style={{ paddingTop: 11 }}>Product / service</div>
+          <input className={inputCls} value={payload.brief.productName} onChange={(e) => updateBrief("productName", e.target.value)} placeholder="e.g. Vitamin C Serum" disabled={busy} />
+        </div>
 
-          <label className="flex flex-col gap-2 text-sm text-slate-700 sm:col-span-2">
-            <span className="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
-              Audience
-            </span>
-            <input
-              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-100"
-              value={payload.brief.audience}
-              onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-                updateBrief("audience", event.target.value)
-              }
-              disabled={busy}
-            />
-          </label>
+        {/* Product description */}
+        <div className="mb-3.5 grid grid-cols-[110px_1fr] items-start gap-3">
+          <div className={labelCls} style={{ paddingTop: 11 }}>Product description</div>
+          <div className="relative">
+            <textarea className={`${inputCls} min-h-[78px] resize-none`} value={payload.brief.productDescription} onChange={(e) => updateBrief("productDescription", e.target.value)} placeholder="Describe your product / service, key benefits, differentiators..." disabled={busy} />
+            <span className="absolute right-3 bottom-2 text-[11px] text-[#a7adbb]">{payload.brief.productDescription.length} / 500</span>
+          </div>
+        </div>
 
-          <label className="flex flex-col gap-2 text-sm text-slate-700 sm:col-span-2">
-            <span className="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
-              Objective
-            </span>
-            <input
-              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-100"
-              value={payload.brief.objective}
-              onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-                updateBrief("objective", event.target.value)
-              }
-              disabled={busy}
-            />
-          </label>
+        {/* Target audience */}
+        <div className="mb-3.5 grid grid-cols-[110px_1fr] items-start gap-3">
+          <div className={labelCls} style={{ paddingTop: 11 }}>Target audience</div>
+          <input className={inputCls} value={payload.brief.audience} onChange={(e) => updateBrief("audience", e.target.value)} placeholder="e.g. Skincare enthusiasts, ages 18-35" disabled={busy} />
+        </div>
 
-          <label className="flex flex-col gap-2 text-sm text-slate-700 sm:col-span-2">
-            <span className="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
-              Product description
-            </span>
-            <input
-              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-100"
-              value={payload.brief.productDescription}
-              onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-                updateBrief("productDescription", event.target.value)
-              }
-              placeholder="Short description of the product"
-              disabled={busy}
-            />
-          </label>
+        {/* Platform */}
+        <div className="mb-3.5 grid grid-cols-[110px_1fr] items-start gap-3">
+          <div className={labelCls} style={{ paddingTop: 11 }}>Platform</div>
+          <div className="grid grid-cols-3 gap-2">
+            {(["TikTok", "Instagram Reels", "YouTube Shorts"] as const).map((platform) => {
+              const sel = payload.brief.platforms[0] === platform;
+              const platformIcon = platform === "TikTok" ? (
+                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor"><path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.88 2.89 2.89 0 01-2.88-2.88 2.89 2.89 0 012.88-2.88c.28 0 .56.04.82.1v-3.5a6.37 6.37 0 00-.82-.05A6.34 6.34 0 003.15 15.7a6.34 6.34 0 006.34 6.34 6.34 6.34 0 006.34-6.34V9.44a8.16 8.16 0 004.76 1.52v-3.4a4.85 4.85 0 01-1-.87z"/></svg>
+              ) : platform === "Instagram Reels" ? (
+                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg>
+              ) : (
+                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+              );
+              return (
+                <button key={platform} type="button" disabled={busy}
+                  className={`inline-flex items-center justify-center gap-1.5 rounded-[10px] border px-2 py-2 text-xs font-semibold transition ${sel ? "border-orange-300 bg-white text-orange-500" : "border-[#e4e7ef] bg-white text-[#6b7280] hover:border-orange-200"}`}
+                  onClick={() => updateBrief("platforms", [platform])}
+                >
+                  {platformIcon}
+                  {platform === "Instagram Reels" ? "Reels" : platform === "YouTube Shorts" ? "Shorts" : platform}
+                </button>
+              );
+            })}
+          </div>
+        </div>
 
-          <label className="flex flex-col gap-2 text-sm text-slate-700 sm:col-span-2">
-            <span className="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
-              Main message
-            </span>
-            <input
-              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-100"
-              value={payload.brief.mainMessage}
-              onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-                updateBrief("mainMessage", event.target.value)
-              }
-              placeholder="Core message of the video"
-              disabled={busy}
-            />
-          </label>
-
-          <div className="flex flex-col gap-2 text-sm text-slate-700">
-            <span className="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
-              Platforms
-            </span>
-            <div className="flex flex-wrap gap-2">
-              {(["TikTok", "Instagram Reels", "YouTube Shorts"] as const).map((platform) => {
-                const isSelected = payload.brief.platforms.includes(platform);
-                return (
-                  <button
-                    key={platform}
-                    type="button"
-                    className={`rounded-xl border px-3 py-2 text-sm font-medium transition ${
-                      isSelected
-                        ? "border-sky-400 bg-sky-50 text-sky-700"
-                        : "border-slate-200 bg-white text-slate-600 hover:border-sky-300"
-                    }`}
-                    onClick={() => {
-                      const next = isSelected
-                        ? payload.brief.platforms.filter((p) => p !== platform)
-                        : [...payload.brief.platforms, platform];
-                      if (next.length > 0) updateBrief("platforms", next);
-                    }}
-                    disabled={busy}
-                  >
-                    {platform}
-                  </button>
-                );
-              })}
+        {/* Duration + Aspect ratio row */}
+        <div className="mb-3.5 grid grid-cols-2 gap-3.5">
+          <div>
+            <div className={`${labelCls} mb-[7px]`}>Target duration</div>
+            <div className="grid h-10 grid-cols-3 overflow-hidden rounded-[9px] border border-[#e4e7ef] bg-white">
+              {([15, 20, 30] as const).map((d) => (
+                <button key={d} type="button" disabled={busy}
+                  className={`border-0 text-sm font-semibold ${payload.brief.targetDuration === d ? "bg-orange-500 text-white" : "bg-white text-[#111827]"}`}
+                  onClick={() => updateBrief("targetDuration", d)}
+                >{d}s</button>
+              ))}
             </div>
           </div>
-
-          <label className="flex flex-col gap-2 text-sm text-slate-700">
-            <span className="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
-              Aspect ratio
-            </span>
-            <select
-              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-100"
-              value={payload.brief.aspectRatio}
-              onChange={(event: React.ChangeEvent<HTMLSelectElement>) =>
-                updateBrief("aspectRatio", event.target.value as Brief["aspectRatio"])
-              }
-              disabled={busy}
-            >
-              <option value="9:16">9:16 (Vertical)</option>
-              <option value="1:1">1:1 (Square)</option>
+          <div>
+            <div className={`${labelCls} mb-[7px]`}>Video aspect ratio</div>
+            <select className={inputCls} value={payload.brief.aspectRatio} onChange={(e) => updateBrief("aspectRatio", e.target.value as Brief["aspectRatio"])} disabled={busy}>
+              <option value="9:16">9:16</option>
+              <option value="1:1">1:1</option>
             </select>
-          </label>
+          </div>
+        </div>
 
-          <label className="flex flex-col gap-2 text-sm text-slate-700">
-            <span className="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
-              Resolution
-            </span>
-            <select
-              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-100"
-              value={payload.brief.resolution}
-              onChange={(event: React.ChangeEvent<HTMLSelectElement>) =>
-                updateBrief("resolution", event.target.value as Brief["resolution"])
-              }
-              disabled={busy}
-            >
+        {/* Resolution + Brand tone row */}
+        <div className="mb-3.5 grid grid-cols-2 gap-3.5">
+          <div>
+            <div className={`${labelCls} mb-[7px]`}>Resolution</div>
+            <select className={inputCls} value={payload.brief.resolution} onChange={(e) => updateBrief("resolution", e.target.value as Brief["resolution"])} disabled={busy}>
               <option value="720p">720p</option>
               <option value="1080p">1080p</option>
             </select>
-          </label>
-
-          <label className="flex flex-col gap-2 text-sm text-slate-700">
-            <span className="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
-              Duration
-            </span>
-            <select
-              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-100"
-              value={payload.brief.targetDuration}
-              onChange={(event: React.ChangeEvent<HTMLSelectElement>) =>
-                updateBrief(
-                  "targetDuration",
-                  Number(event.target.value) as Brief["targetDuration"],
-                )
-              }
-              disabled={busy}
-            >
-              <option value={15}>15 seconds</option>
-              <option value={20}>20 seconds</option>
-              <option value={30}>30 seconds</option>
-            </select>
-          </label>
-
-          <label className="flex flex-col gap-2 text-sm text-slate-700">
-            <span className="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
-              CTA
-            </span>
-            <input
-              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-100"
-              value={payload.brief.callToAction}
-              onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-                updateBrief("callToAction", event.target.value)
-              }
-              disabled={busy}
-            />
-          </label>
-
-          <label className="flex flex-col gap-2 text-sm text-slate-700">
-            <span className="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
-              Brand tone
-            </span>
-            <input
-              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-100"
-              value={payload.brief.brandTone}
-              onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-                updateBrief("brandTone", event.target.value)
-              }
-              disabled={busy}
-            />
-          </label>
-
-          <label className="flex flex-col gap-2 text-sm text-slate-700">
-            <span className="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
-              Primary color
-            </span>
-            <div className="flex items-center gap-3">
-              <input
-                type="color"
-                className="h-11 w-14 cursor-pointer rounded-xl border border-slate-200 bg-white p-1"
-                value={normalizeHexColor(payload.brandKit.primaryColorHex)}
-                onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-                  updateBrandKit("primaryColorHex", event.target.value.toUpperCase())
-                }
-                disabled={busy}
-              />
-              <input
-                className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-100"
-                value={payload.brandKit.primaryColorHex ?? ""}
-                onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-                  updateBrandKit("primaryColorHex", event.target.value)
-                }
-                placeholder="#2E7D32"
-                disabled={busy}
-              />
-            </div>
-          </label>
-
-          <label className="flex flex-col gap-2 text-sm text-slate-700">
-            <span className="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
-              Secondary color
-            </span>
-            <div className="flex items-center gap-3">
-              <input
-                type="color"
-                className="h-11 w-14 cursor-pointer rounded-xl border border-slate-200 bg-white p-1"
-                value={normalizeHexColor(payload.brandKit.secondaryColorHex)}
-                onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-                  updateBrandKit("secondaryColorHex", event.target.value.toUpperCase())
-                }
-                disabled={busy}
-              />
-              <input
-                className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-100"
-                value={payload.brandKit.secondaryColorHex ?? ""}
-                onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-                  updateBrandKit("secondaryColorHex", event.target.value)
-                }
-                placeholder="#FFFFFF"
-                disabled={busy}
-              />
-            </div>
-          </label>
-        </div>
-
-        <div className="mt-8 rounded-[24px] border border-slate-200 bg-slate-50 p-5">
-          <div className="mb-4">
-            <h3 className="text-lg font-semibold text-slate-900">Images</h3>
-            <p className="text-sm text-slate-500">Kéo thả ảnh vào khung hoặc bấm để chọn file.</p>
           </div>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            {assetSlots.map((slot) => {
-              const asset = getAssetByType(payload.brandKit.assets, slot.type) ?? emptyAsset(slot.type);
-              const isUploading = uploadingAssetType === slot.type;
-              const isDragging = draggingAssetType === slot.type;
-              const hasPreview = Boolean(asset.publicUrl);
-
-              return (
-                <div
-                  key={slot.type}
-                  className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
-                >
-                  <div className="mb-3">
-                    <div className="text-sm font-semibold text-slate-900">{slot.title}</div>
-                    <div className="text-xs text-slate-500">{slot.hint}</div>
-                  </div>
-
-                  <label
-                    className={`relative flex min-h-56 cursor-pointer flex-col items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed px-4 py-5 text-center transition ${
-                      isDragging
-                        ? "border-sky-400 bg-sky-50"
-                        : "border-slate-200 bg-slate-50 hover:border-sky-300 hover:bg-sky-50/60"
-                    }`}
-                    onDragOver={(event) => {
-                      event.preventDefault();
-                      if (!busy && uploadingAssetType === null) {
-                        setDraggingAssetType(slot.type);
-                      }
-                    }}
-                    onDragLeave={() => {
-                      setDraggingAssetType((current) => (current === slot.type ? null : current));
-                    }}
-                    onDrop={(event) => {
-                      event.preventDefault();
-                      const file = event.dataTransfer.files?.[0] ?? null;
-                      void handleAssetUpload(slot.type, file);
-                    }}
-                  >
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="absolute inset-0 cursor-pointer opacity-0"
-                      onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
-                        const file = event.currentTarget.files?.[0] ?? null;
-                        void handleAssetUpload(slot.type, file);
-                        event.currentTarget.value = "";
-                      }}
-                      disabled={busy || uploadingAssetType !== null}
-                    />
-
-                    {hasPreview ? (
-                      <>
-                        <Image
-                          src={asset.publicUrl!}
-                          alt={asset.fileName || slot.title}
-                          width={800}
-                          height={500}
-                          className="h-full w-full rounded-xl object-cover"
-                        />
-                        <div className="absolute inset-x-4 bottom-4 rounded-xl bg-white/88 px-3 py-2 text-sm font-medium text-slate-700 shadow-sm backdrop-blur">
-                          Bấm hoặc kéo thả để thay ảnh
-                        </div>
-                      </>
-                    ) : (
-                      <div className="space-y-3">
-                        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-sky-100 text-sky-600">
-                          <svg
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="1.8"
-                            className="h-7 w-7"
-                            aria-hidden="true"
-                          >
-                            <path d="M12 16V4" />
-                            <path d="m7 9 5-5 5 5" />
-                            <path d="M5 20h14" />
-                          </svg>
-                        </div>
-                        <div className="text-sm font-medium text-slate-700">
-                          {isUploading ? "Đang tải lên..." : "Kéo thả ảnh vào đây"}
-                        </div>
-                        <div className="text-sm text-slate-500">hoặc bấm để chọn file</div>
-                      </div>
-                    )}
-                  </label>
-                </div>
-              );
-            })}
+          <div>
+            <div className={`${labelCls} mb-[7px]`}>Brand tone</div>
+            <input className={inputCls} value={payload.brief.brandTone} onChange={(e) => updateBrief("brandTone", e.target.value)} placeholder="e.g. Premium, trustworthy" disabled={busy} />
           </div>
         </div>
 
-        <div className="mt-6 flex flex-wrap gap-3">
-          <button
-            className="rounded-xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-50"
-            onClick={handleCreateProject}
-            disabled={busy || uploadingAssetType !== null}
-          >
-            Create
-          </button>
+        {/* Main message */}
+        <div className="mb-3.5 grid grid-cols-[110px_1fr] items-start gap-3">
+          <div className={labelCls} style={{ paddingTop: 11 }}>Main message</div>
+          <div className="relative">
+            <input className={inputCls} value={payload.brief.mainMessage} onChange={(e) => updateBrief("mainMessage", e.target.value)} placeholder="e.g. Brighten skin naturally with Vitamin C" disabled={busy} />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-[#a7adbb]">{payload.brief.mainMessage.length} / 120</span>
+          </div>
+        </div>
 
+        {/* Compliance constraints */}
+        <div className="mb-3.5 grid grid-cols-[110px_1fr] items-start gap-3">
+          <div className={labelCls} style={{ paddingTop: 11 }}>
+            Compliance constraints
+            <span className="block font-medium text-[#6b7280]">(optional)</span>
+          </div>
+          <div className="relative">
+            <textarea className={`${inputCls} min-h-[58px] resize-none`} value={payload.brief.complianceConstraints} onChange={(e) => updateBrief("complianceConstraints", e.target.value)} placeholder="e.g. No medical claims, avoid superlatives..." disabled={busy} />
+            <span className="absolute right-3 bottom-2 text-[11px] text-[#a7adbb]">{payload.brief.complianceConstraints.length} / 300</span>
+          </div>
+        </div>
+
+        {/* Call to action */}
+        <div className="mb-3.5 grid grid-cols-[110px_1fr] items-start gap-3">
+          <div className={labelCls} style={{ paddingTop: 11 }}>
+            Call to action
+            <span className="block font-medium text-[#6b7280]">(optional)</span>
+          </div>
+          <div className="relative">
+            <input className={inputCls} value={payload.brief.callToAction ?? ""} onChange={(e) => updateBrief("callToAction", e.target.value)} placeholder="e.g. Shop now, Get yours today" disabled={busy} />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-[#a7adbb]">{(payload.brief.callToAction ?? "").length} / 80</span>
+          </div>
+        </div>
+
+
+        {/* Product images */}
+        <div className="mb-2 flex items-center justify-between">
+          <div className="text-xs font-extrabold">Product images <span className="font-medium text-[#6b7280]">(1-4)</span></div>
+          <button type="button" className="text-[11px] text-[#6b7280] hover:underline" onClick={() => updateBrandKit("assets", payload.brandKit.assets.filter((a) => a.type !== "product-image"))}>Clear all</button>
+        </div>
+        <div className="mb-4 grid grid-cols-4 gap-2.5">
+          {payload.brandKit.assets.filter((a) => a.type === "product-image").map((asset, i) => (
+            <div key={`pi-${i}`} className="relative h-16 overflow-hidden rounded-[10px] border border-[#e4e7ef] bg-[#f3f4f6]">
+              {asset.publicUrl && <Image src={asset.publicUrl} alt={asset.fileName} width={120} height={64} className="h-full w-full object-cover" />}
+              <button type="button" className="absolute right-1.5 top-1.5 flex h-[18px] w-[18px] items-center justify-center rounded-full bg-[rgba(17,24,39,0.78)] text-[11px] text-white"
+                onClick={() => updateBrandKit("assets", payload.brandKit.assets.filter((_, idx) => idx !== payload.brandKit.assets.indexOf(asset)))}
+              >x</button>
+            </div>
+          ))}
+          {payload.brandKit.assets.filter((a) => a.type === "product-image").length < 4 && (
+            <label className="flex h-16 cursor-pointer flex-col items-center justify-center rounded-[10px] border border-dashed border-[#c9cedb] bg-white text-xs text-[#374151]">
+              <strong className="text-2xl font-normal leading-none">+</strong>
+              <span>Add image</span>
+              <input type="file" accept="image/*" className="hidden" onChange={(e) => { const file = e.currentTarget.files?.[0] ?? null; void handleAssetUpload("product-image", file); e.currentTarget.value = ""; }} disabled={busy || uploadingAssetType !== null} />
+            </label>
+          )}
+        </div>
+
+        {/* Logo upload */}
+        <div className="mb-2 text-xs font-extrabold">Optional logo</div>
+        {(() => {
+          const logoAsset = getAssetByType(payload.brandKit.assets, "logo");
+          return logoAsset?.publicUrl ? (
+            <div className="mb-4 flex items-center gap-3 rounded-[10px] border border-[#e4e7ef] bg-white p-2">
+              <Image src={logoAsset.publicUrl} alt={logoAsset.fileName} width={48} height={48} className="h-12 w-12 rounded-lg object-cover" />
+              <div className="flex-1">
+                <strong className="block text-xs text-[#4b5563]">{logoAsset.fileName}</strong>
+                <small className="text-[#9ca3af]">Logo uploaded</small>
+              </div>
+              <label className="cursor-pointer rounded-md bg-[#f3f4f6] px-2 py-1 text-[11px] font-medium text-[#374151] hover:bg-[#e5e7eb]">
+                Replace
+                <input type="file" accept="image/*" className="hidden" onChange={(e) => { const file = e.currentTarget.files?.[0] ?? null; void handleAssetUpload("logo", file); e.currentTarget.value = ""; }} disabled={busy || uploadingAssetType !== null} />
+              </label>
+            </div>
+          ) : (
+            <label className="mb-4 flex h-[52px] cursor-pointer items-center justify-center gap-3 rounded-[10px] border border-dashed border-[#cbd2e1] bg-white text-center text-[#6b7280]">
+              <span className="text-xl">&#8679;</span>
+              <div>
+                <strong className="block text-xs text-[#4b5563]">Upload logo (optional)</strong>
+                <small className="text-[#9ca3af]">PNG, JPG or SVG</small>
+              </div>
+              <input type="file" accept="image/*" className="hidden" onChange={(e) => { const file = e.currentTarget.files?.[0] ?? null; void handleAssetUpload("logo", file); e.currentTarget.value = ""; }} disabled={busy || uploadingAssetType !== null} />
+            </label>
+          );
+        })()}
+
+        {/* Moodboard upload */}
+        <div className="mb-2 text-xs font-extrabold">Optional moodboard / visual reference</div>
+        {(() => {
+          const moodAsset = getAssetByType(payload.brandKit.assets, "moodboard");
+          return moodAsset?.publicUrl ? (
+            <div className="mb-4 flex items-center gap-3 rounded-[10px] border border-[#e4e7ef] bg-white p-2">
+              <Image src={moodAsset.publicUrl} alt={moodAsset.fileName} width={48} height={48} className="h-12 w-12 rounded-lg object-cover" />
+              <div className="flex-1">
+                <strong className="block text-xs text-[#4b5563]">{moodAsset.fileName}</strong>
+                <small className="text-[#9ca3af]">Moodboard uploaded</small>
+              </div>
+              <label className="cursor-pointer rounded-md bg-[#f3f4f6] px-2 py-1 text-[11px] font-medium text-[#374151] hover:bg-[#e5e7eb]">
+                Replace
+                <input type="file" accept="image/*,.pdf" className="hidden" onChange={(e) => { const file = e.currentTarget.files?.[0] ?? null; void handleAssetUpload("moodboard", file); e.currentTarget.value = ""; }} disabled={busy || uploadingAssetType !== null} />
+              </label>
+            </div>
+          ) : (
+            <label className="mb-4 flex h-[52px] cursor-pointer items-center justify-center gap-3 rounded-[10px] border border-dashed border-[#cbd2e1] bg-white text-center text-[#6b7280]">
+              <span className="text-xl">&#8679;</span>
+              <div>
+                <strong className="block text-xs text-[#4b5563]">Upload moodboard (optional)</strong>
+                <small className="text-[#9ca3af]">PNG, JPG or PDF</small>
+              </div>
+              <input type="file" accept="image/*,.pdf" className="hidden" onChange={(e) => { const file = e.currentTarget.files?.[0] ?? null; void handleAssetUpload("moodboard", file); e.currentTarget.value = ""; }} disabled={busy || uploadingAssetType !== null} />
+            </label>
+          );
+        })()}
+
+        {error && <div className="mb-4 rounded-[10px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>}
+
+        {/* Action buttons */}
+        <div className="grid grid-cols-3 gap-2">
           <button
-            className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
-            onClick={handleGenerate}
-            disabled={
-              busy || uploadingAssetType !== null || !project?.projectId || isProjectActive
-            }
+            className="rounded-[10px] bg-gradient-to-br from-orange-500 to-orange-600 px-3 py-3 text-xs font-extrabold text-white shadow-[0_10px_24px_rgba(249,115,22,0.25)] transition hover:from-orange-600 hover:to-orange-700 disabled:cursor-not-allowed disabled:opacity-50"
+            onClick={project?.projectId ? handleGenerate : handleCreateProject}
+            disabled={busy || uploadingAssetType !== null || isProjectActive}
           >
             {isProjectActive ? "Generating..." : "Generate"}
           </button>
-
           <button
-            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-            onClick={handleRefresh}
-            disabled={busy || uploadingAssetType !== null || !project?.projectId}
+            className="rounded-[10px] border border-[#e4e7ef] bg-white px-3 py-3 text-xs font-extrabold text-[#374151] transition hover:bg-[#f9fafb] disabled:cursor-not-allowed disabled:opacity-50"
+            onClick={handleCancel}
+            disabled={busy || !isProjectActive}
           >
-            Reload
+            Cancel
+          </button>
+          <button
+            className="rounded-[10px] border border-[#e4e7ef] bg-white px-3 py-3 text-xs font-extrabold text-[#374151] transition hover:bg-[#f9fafb] disabled:cursor-not-allowed disabled:opacity-50"
+            onClick={handleReset}
+            disabled={busy}
+          >
+            Reset
           </button>
         </div>
+      </aside>
 
-        {error ? (
-          <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-            {error}
-          </div>
-        ) : null}
-      </section>
-
-      <section className="space-y-6">
-        <article className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div className="space-y-1">
-              <h2 className="text-xl font-semibold text-slate-900">Run Status</h2>
-              <p className="text-sm text-slate-500">
-                {project?.projectId ? project.projectId : "No project"}
-              </p>
-            </div>
-            <span
-              className={`inline-flex items-center justify-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] ${statusColor(
-                project?.status ?? "draft",
-              )}`}
-            >
-              {project?.status ?? "draft"}
-            </span>
-          </div>
-
-          <ol className="mt-5 space-y-3 text-sm">
-            {workflowNodeIds.map((nodeId) => {
+      {/* ───── RIGHT: Workflow + Variants + Comparison + Feedback + Export ───── */}
+      <section className="space-y-4">
+        {/* Workflow Progress */}
+        <div className="rounded-2xl border border-[#e4e7ef] bg-white p-[18px] shadow-[0_10px_30px_rgba(15,23,42,0.06)]">
+          <h2 className="text-[17px] font-extrabold text-[#111827]">Workflow Progress</h2>
+          <div className="mt-3.5 grid grid-cols-6 gap-3">
+            {workflowNodeIds.map((nodeId, idx) => {
               const nodeRun = project?.workflowStatus?.[nodeId];
               const status = nodeRun?.status ?? "pending";
-              const isExpanded = expandedNode === nodeId;
-              const resultLines = getNodeResultLines(project, nodeId);
+              const isActive = status === "running";
+              const isDone = status === "completed";
+              const isFailed = status === "failed";
+
+              let stepCls = "h-11 flex items-center justify-between gap-1.5 rounded-[10px] border px-3 text-xs font-bold transition cursor-pointer";
+              if (isActive) stepCls += " border-orange-400 bg-white text-orange-500 shadow-[0_0_0_3px_rgba(249,115,22,0.14)]";
+              else if (isDone) stepCls += " border-[#e4e7ef] bg-white text-[#111827]";
+              else if (isFailed) stepCls += " border-rose-300 bg-rose-50 text-rose-600";
+              else stepCls += " border-[#e4e7ef] bg-[#fbfbfd] text-[#9ca3af]";
 
               return (
-                <li key={nodeId} className="rounded-2xl border border-slate-200 bg-slate-50">
-                  <button
-                    className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
-                    onClick={() =>
-                      setExpandedNode((prev) => (prev === nodeId ? null : nodeId))
-                    }
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className={`h-2.5 w-2.5 rounded-full ${nodeStatusColor(status)}`} />
-                      <span className="font-medium text-slate-900">{nodeId}</span>
-                    </div>
-                    <div className="flex items-center gap-3 text-xs text-slate-500">
-                      <span className="rounded-full border border-slate-200 bg-white px-2 py-1 font-medium text-slate-600">
-                        {nodeStatusText(status)}
-                      </span>
-                      <span>{formatElapsedTime(nodeRun?.startedAt, nodeRun?.completedAt)}</span>
-                      {nodeRun?.startedAt ? <span>{formatTimestamp(nodeRun.startedAt)}</span> : null}
-                    </div>
-                  </button>
-
-                  {nodeRun && isExpanded ? (
-                    <div className="space-y-3 border-t border-slate-200 px-4 py-4 text-xs text-slate-600">
-                      {nodeRun.errorMessage ? (
-                        <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-rose-700">
-                          {nodeRun.errorMessage}
-                        </div>
-                      ) : null}
-
-                      <div className="grid gap-2 sm:grid-cols-2">
-                        <div>
-                          <div className="text-slate-400">Status</div>
-                          <div className="font-medium text-slate-900">{nodeStatusText(status)}</div>
-                        </div>
-                        <div>
-                          <div className="text-slate-400">Attempts</div>
-                          <div className="font-medium text-slate-900">{nodeRun.attempts}</div>
-                        </div>
-                        <div>
-                          <div className="text-slate-400">Started</div>
-                          <div className="font-medium text-slate-900">
-                            {formatTimestamp(nodeRun.startedAt) || "-"}
-                          </div>
-                        </div>
-                        <div>
-                          <div className="text-slate-400">Completed</div>
-                          <div className="font-medium text-slate-900">
-                            {formatTimestamp(nodeRun.completedAt) || "-"}
-                          </div>
-                        </div>
-                        <div>
-                          <div className="text-slate-400">Elapsed</div>
-                          <div className="font-medium text-slate-900">
-                            {formatElapsedTime(nodeRun.startedAt, nodeRun.completedAt)}
-                          </div>
-                        </div>
-                      </div>
-
-                      {nodeRun.status !== "pending" && resultLines.length ? (
-                        <div className="space-y-2">
-                          <div className="text-slate-400">
-                            {nodeRun.status === "completed" ? "Result" : "Progress"}
-                          </div>
-                          <ul className="space-y-1">
-                            {resultLines.map((line, index) => (
-                              <li key={`${nodeId}-result-${index}`} className="text-slate-700">
-                                {line}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      ) : null}
-
-                      <div className="space-y-2">
-                        <div className="text-slate-400">Logs</div>
-                        {nodeRun.logs.length ? (
-                          <ul className="space-y-1">
-                            {nodeRun.logs.map((line, index) => (
-                              <li key={`${nodeId}-${index}`} className="text-slate-700">
-                                {line}
-                              </li>
-                            ))}
-                          </ul>
-                        ) : (
-                          <div className="text-slate-400">No logs yet.</div>
-                        )}
-                      </div>
-                    </div>
-                  ) : null}
-                </li>
+                <button key={nodeId} type="button" className={stepCls} onClick={() => setExpandedNode((prev) => (prev === nodeId ? null : nodeId))}>
+                  {isDone ? (
+                    <span className="flex h-[18px] w-[18px] flex-none items-center justify-center rounded-full bg-emerald-500 text-[10px] font-extrabold text-white">✓</span>
+                  ) : isActive ? (
+                    <span className="h-[15px] w-[15px] flex-none rounded-full border-2 border-orange-200 border-t-orange-500 animate-spin-slow" />
+                  ) : (
+                    <span className={`flex h-[18px] w-[18px] flex-none items-center justify-center rounded-full text-[10px] font-extrabold ${isFailed ? "bg-rose-500 text-white" : "bg-[#e5e7eb] text-[#9ca3af]"}`}>{idx + 1}</span>
+                  )}
+                  <span className="truncate">{nodeLabels[nodeId] ?? nodeId}</span>
+                  {isDone && <span className="flex h-[18px] w-[18px] flex-none items-center justify-center rounded-full bg-emerald-500 text-[10px] text-white">✓</span>}
+                </button>
               );
             })}
-          </ol>
-        </article>
+          </div>
 
-        <article className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="text-xl font-semibold text-slate-900">Variants</h2>
-
-          <div className="mt-4 grid gap-4 lg:grid-cols-2">
-            {project?.variants?.length ? (
-              project.variants.map((variant) => (
-                <div
-                  key={variant.id}
-                  className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="space-y-1">
-                      <div className="text-sm font-semibold text-slate-900">{variant.name}</div>
-                      <div className="text-xs text-slate-500">{variant.strategy?.angle}</div>
-                    </div>
-                    <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-600">
-                      {variant.id}
-                    </span>
-                  </div>
-
-                  <div className="mt-4 space-y-3 text-sm text-slate-700">
-                    <div>
-                      <div className="text-xs uppercase tracking-[0.18em] text-slate-400">
-                        Title
-                      </div>
-                      <div className="mt-1 text-slate-900">
-                        {variant.generatedTitle ?? "Not generated yet."}
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="text-xs uppercase tracking-[0.18em] text-slate-400">
-                        Hook
-                      </div>
-                      <div className="mt-1 text-slate-900">
-                        {variant.selectedHook?.text ?? "Not generated yet."}
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="text-xs uppercase tracking-[0.18em] text-slate-400">
-                        Script beats
-                      </div>
-                      {variant.script?.length ? (
-                        <ul className="mt-2 space-y-1 text-xs text-slate-700">
-                          {variant.script.slice(0, 6).map((beat) => (
-                            <li key={`${variant.id}-${beat.startMs}`}>
-                              <span className="text-slate-400">
-                                {Math.round(beat.startMs / 1000)}s–{Math.round(beat.endMs / 1000)}s:
-                              </span>{" "}
-                              {beat.narration}
-                            </li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <div className="mt-1 text-slate-400">Not generated yet.</div>
-                      )}
-                    </div>
-
-                    <div>
-                      <div className="text-xs uppercase tracking-[0.18em] text-slate-400">
-                        Caption
-                      </div>
-                      <div className="mt-1 whitespace-pre-line text-slate-900">
-                        {variant.generatedCaption ?? "Not generated yet."}
-                      </div>
-                      {variant.generatedHashtags?.length ? (
-                        <div className="mt-2 text-xs text-sky-700">
-                          {variant.generatedHashtags.join(" ")}
-                        </div>
-                      ) : null}
-                    </div>
-
-                    <div>
-                      <div className="text-xs uppercase tracking-[0.18em] text-slate-400">
-                        Segment plan
-                      </div>
-                      {variant.segmentPlan?.length ? (
-                        <ul className="mt-2 space-y-2 text-xs text-slate-700">
-                          {variant.segmentPlan.map((segment) => (
-                            <li
-                              key={segment.id}
-                              className="rounded-xl border border-slate-200 bg-white px-3 py-2"
-                            >
-                              <div className="flex items-center justify-between gap-2">
-                                <span className="font-medium text-slate-900">{segment.id}</span>
-                                <span className="text-slate-400">
-                                  {segment.durationSeconds}s · {segment.purpose} ·{" "}
-                                  {segment.generationMode ?? "T2V"} ·{" "}
-                                  {segment.status ?? "pending"}
-                                </span>
-                              </div>
-                              <div className="mt-1 text-slate-600">
-                                {truncate(
-                                  segment.promptSummary ?? "Prompt summary pending.",
-                                  180,
-                                )}
-                              </div>
-                            </li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <div className="mt-1 text-slate-400">Not generated yet.</div>
-                      )}
-                    </div>
-
-                    <div>
-                      <div className="text-xs uppercase tracking-[0.18em] text-slate-400">
-                        Evaluation
-                      </div>
-                      {variant.score ? (
-                        <div className="mt-2 space-y-2">
-                          <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2">
-                            <span className="text-slate-600">Publishable score</span>
-                            <span className="font-semibold text-slate-900">
-                              {variant.score.publishableScore}
-                            </span>
-                          </div>
-                          <div className="text-slate-700">
-                            {variant.evaluationSummary ?? "No summary yet."}
-                          </div>
-                          {variant.evaluationNotes?.length ? (
-                            <ul className="space-y-1 text-xs text-slate-700">
-                              {variant.evaluationNotes.map((note) => (
-                                <li key={`${variant.id}-${note}`}>{note}</li>
-                              ))}
-                            </ul>
-                          ) : null}
-                        </div>
-                      ) : (
-                        <div className="mt-1 text-slate-400">Not generated yet.</div>
-                      )}
-                    </div>
-
-                    <div>
-                      <div className="text-xs uppercase tracking-[0.18em] text-slate-400">
-                        Artifacts
-                      </div>
-                      {variant.artifacts.length ? (
-                        <ul className="mt-2 space-y-1 text-xs text-slate-700">
-                          {variant.artifacts.map((artifact) => (
-                            <li key={`${variant.id}-${artifact.kind}-${artifact.path}`}>
-                              <span className="text-slate-400">
-                                {artifactLabel(artifact.kind)}:
-                              </span>{" "}
-                              {truncate(artifact.path, 88)}
-                            </li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <div className="mt-1 text-slate-400">Not generated yet.</div>
-                      )}
-                    </div>
+          {/* Expanded node detail */}
+          {expandedNode && project?.workflowStatus?.[expandedNode] && (() => {
+            const nodeRun = project.workflowStatus[expandedNode];
+            const resultLines = getNodeResultLines(project, expandedNode);
+            
+            return (
+              <div className="mt-3 rounded-[10px] border border-[#e4e7ef] bg-[#fbfbfd] p-4 text-xs text-[#374151]">
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="font-extrabold text-[#111827]">{nodeLabels[expandedNode] ?? expandedNode}</span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={busy || isProjectActive}
+                      className="rounded-md bg-orange-500 px-2 py-1 text-[10px] font-bold text-white hover:bg-orange-600 disabled:opacity-40"
+                      onClick={() => handleRunFromNode(expandedNode)}
+                    >
+                      ▶ Run again
+                    </button>
+                    <span className="text-[#6b7280]">{formatElapsedTime(nodeRun.startedAt, nodeRun.completedAt)}</span>
                   </div>
                 </div>
-              ))
-            ) : (
-              <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-sm text-slate-400 lg:col-span-2">
-                No variants available yet.
+                {nodeRun.errorMessage && <div className="mb-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-rose-700">{nodeRun.errorMessage}</div>}
+                {resultLines.length > 0 && <ul className="mb-2 space-y-1">{resultLines.map((l, i) => <li key={i}>{l}</li>)}</ul>}
+                {nodeRun.logs.length > 0 && <ul className="space-y-1 text-[#6b7280]">{nodeRun.logs.map((l, i) => <li key={i}>{l}</li>)}</ul>}
+                
+                {/* Seedance Clips Video Preview Grid */}
+                {expandedNode === "seedance-segment-generator" && project?.variants && (
+                  <div className="mt-3 space-y-3">
+                    {project.variants.map((variant) => {
+                      const segments = (variant.segmentPlan ?? []).filter((seg) => seg.rawVideoPath);
+                      if (segments.length === 0) return null;
+                      
+                      return (
+                        <div key={variant.id}>
+                          <div className="mb-2 font-bold text-[#111827]">Variant {variant.id}</div>
+                          <div className="grid grid-cols-6 gap-1.5">
+                            {segments.map((segment) => (
+                              <div key={segment.id} className="rounded border border-[#e4e7ef] bg-white p-1">
+                                <div className="mb-0.5 text-[8px] font-bold text-[#6b7280]">{segment.id}</div>
+                                <video 
+                                  src={`/api/outputs/${segment.rawVideoPath?.split("outputs/generated/")[1] ?? segment.rawVideoPath}`} 
+                                  className="w-full rounded bg-[#111827]" 
+                                  controls 
+                                  muted
+                                  preload="metadata"
+                                  style={{ aspectRatio: payload.brief.aspectRatio === "1:1" ? "1/1" : "9/16", maxHeight: "80px" }}
+                                />
+                                <div className="mt-0.5 text-[8px] text-[#9ca3af]">{segment.durationSeconds}s</div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-        </article>
+            );
+          })()}
+        </div>
 
-        <article className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        {/* Generated Variants */}
+        <div className="rounded-2xl border border-[#e4e7ef] bg-white p-4 shadow-[0_10px_30px_rgba(15,23,42,0.06)]">
+          <h2 className="mb-3.5 text-[17px] font-extrabold text-[#111827]">Generated Variants</h2>
+
+          {/* Variant cards - always show skeleton */}
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+            {(project?.variants?.length ? project.variants : [{ id: "A" }, { id: "B" }]).map((item) => {
+              const variant = project?.variants?.find((v) => v.id === item.id) ?? null;
+              const variantId = item.id;
+              const finalVideo = variant?.artifacts.find((a) => a.kind === "final-video");
+              const score = variant?.score?.publishableScore;
+
+              return (
+                <article key={variantId} className="grid grid-cols-[190px_1fr] gap-4 rounded-2xl border border-[#e4e7ef] p-3.5">
+                  {/* Video preview */}
+                  <div className="relative h-[365px] overflow-hidden rounded-[10px] bg-[#111827]">
+                    <span className="absolute left-0 top-0 z-10 rounded-br-[9px] bg-orange-500 px-3 py-2 text-xs font-extrabold text-white">Variant {variantId}</span>
+                    {finalVideo ? (
+                      <video src={`/${finalVideo.path}`} className="h-full w-full object-cover" controls muted preload="metadata" />
+                    ) : (
+                      <div className="flex h-full items-center justify-center">
+                        <div className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-white/80 bg-[rgba(17,24,39,0.62)] text-3xl text-white pl-1">&#9654;</div>
+                      </div>
+                    )}
+                    <div className="absolute bottom-3 left-3 right-3 text-[11px] text-white">
+                      0:00 / 0:{String(variant?.segmentPlan?.reduce((s, seg) => s + seg.durationSeconds, 0) ?? payload.brief.targetDuration).padStart(2, "0")}
+                      <div className="mt-2 h-1 overflow-hidden rounded-full bg-white/55"><span className="block h-full w-0 bg-white" /></div>
+                    </div>
+                  </div>
+
+                  {/* Variant body */}
+                  <div className="py-1.5">
+                    <h3 className="text-base font-extrabold">{variant?.name || variant?.strategy?.angle || `Variant ${variantId}`}</h3>
+                    <p className="mt-1.5 text-xs text-[#6b7280]">Hypothesis: {variant?.strategy?.hypothesis ?? "Pending generation..."}</p>
+
+                    <div className="mt-4 flex flex-wrap items-center gap-2.5">
+                      <span className="inline-flex h-[34px] items-center gap-1.5 rounded-lg border border-[#e4e7ef] px-2.5 text-xs font-semibold text-[#4b5563]">&#9719; {payload.brief.targetDuration}s</span>
+                      <span className="inline-flex h-[34px] items-center gap-1.5 rounded-lg border border-[#e4e7ef] px-2.5 text-xs font-semibold text-[#4b5563]">&#8999; {payload.brief.aspectRatio}</span>
+                      <span className="flex items-center gap-2 rounded-lg border border-[#e4e7ef] px-2.5 py-1">
+                        <span className={`rounded-[7px] px-2 py-1 text-lg font-extrabold ${score != null ? "bg-emerald-100 text-emerald-600" : "bg-[#f3f4f6] text-[#9ca3af]"}`}>{score ?? "--"}</span>
+                        <span className="text-[11px] text-[#6b7280]">/100<br/>Publishable Score</span>
+                      </span>
+                    </div>
+
+                    {/* Hook */}
+                    <div className="mt-3.5 rounded-[9px] border border-[#e4e7ef] bg-[#fffaf5] p-3">
+                      <div className="mb-2 text-xs font-extrabold">Selected Hook</div>
+                      <div className={`text-sm font-semibold ${variant?.selectedHook?.text ? "text-orange-500" : "text-[#c4c8d3]"}`}>&ldquo;{variant?.selectedHook?.text ?? "Waiting for generation..."}&rdquo;</div>
+                    </div>
+
+                    {/* Creative Direction */}
+                    <div className="mt-3.5">
+                      <div className="mb-2 text-xs font-extrabold">Creative Direction</div>
+                      <p className={`text-[13px] leading-relaxed ${variant?.strategy ? "text-[#2f3747]" : "text-[#c4c8d3]"}`}>{variant?.strategy?.summary ?? variant?.strategy?.angle ?? "Creative direction will appear after generation."}</p>
+                    </div>
+
+                    {/* Score bars - always show structure */}
+                    <div className="mt-4 space-y-3">
+                      {[
+                        { label: "Hook", value: variant?.score?.hookStrength },
+                        { label: "Brand Fit", value: variant?.score?.brandConsistency },
+                        { label: "Platform Fit", value: variant?.score?.platformFit },
+                      ].map((row) => (
+                        <div key={row.label} className="grid grid-cols-[78px_1fr_46px] items-center gap-2.5 text-xs">
+                          <strong>{row.label}</strong>
+                          <div className="h-[5px] overflow-hidden rounded-full bg-[#e9e9fb]"><span className="block h-full rounded-full bg-orange-500 transition-all" style={{ width: `${row.value ?? 0}%` }} /></div>
+                          <span className={row.value != null ? "" : "text-[#c4c8d3]"}>{row.value ?? "--"} /100</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Variant actions */}
+                  <div className="col-span-2 grid grid-cols-3 gap-3">
+                    {finalVideo ? (
+                      <a href={`/${finalVideo.path}`} download className="flex h-[38px] items-center justify-center rounded-lg border border-[#d7dceb] bg-white text-xs font-bold text-[#374151]">&#8681; Download</a>
+                    ) : (
+                      <button type="button" disabled className="flex h-[38px] items-center justify-center rounded-lg border border-[#d7dceb] bg-white text-xs font-bold text-[#c4c8d3] cursor-not-allowed">&#8681; Download</button>
+                    )}
+                    <button type="button" className={`flex h-[38px] items-center justify-center rounded-lg border border-[#d7dceb] bg-white text-xs font-bold ${variant ? "text-[#374151]" : "text-[#c4c8d3] cursor-not-allowed"}`} disabled={!variant} onClick={() => setExpandedNode((prev) => (prev === "script-writer" ? null : "script-writer"))}>&#9776; View Script</button>
+                    <button type="button" className={`flex h-[38px] items-center justify-center rounded-lg border border-[#d7dceb] bg-white text-xs font-bold ${variant?.generatedCaption ? "text-[#374151]" : "text-[#c4c8d3] cursor-not-allowed"}`} disabled={!variant?.generatedCaption} onClick={() => { if (variant?.generatedCaption) void navigator.clipboard.writeText(variant.generatedCaption + "\n" + (variant.generatedHashtags?.join(" ") ?? "")); }}>&#10697; Copy Caption</button>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+
+          {/* Lower grid: Comparison + Feedback - always show */}
+          <div className="mt-3.5 grid grid-cols-1 gap-3.5 xl:grid-cols-[42%_58%]">
+            {/* Variant Comparison */}
+            <div className="rounded-2xl border border-[#e4e7ef] bg-white p-4">
+              <h2 className="text-[17px] font-extrabold">Variant Comparison</h2>
+              <table className="mt-3 w-full overflow-hidden rounded-[10px] border-collapse text-xs">
+                <thead><tr><th className="border border-[#e4e7ef] bg-[#fafafa] px-2.5 py-[11px] text-left font-extrabold">Criteria</th><th className="border border-[#e4e7ef] bg-[#fafafa] px-2.5 py-[11px] text-left font-extrabold">Variant A</th><th className="border border-[#e4e7ef] bg-[#fafafa] px-2.5 py-[11px] text-left font-extrabold">Variant B</th></tr></thead>
+                <tbody>
+                  <tr><td className="border border-[#e4e7ef] px-2.5 py-[11px] text-[#374151]">Creative angle</td><td className="border border-[#e4e7ef] px-2.5 py-[11px] text-[#374151]">{project?.variants?.[0]?.strategy?.angle ?? <span className="text-[#c4c8d3]">--</span>}</td><td className="border border-[#e4e7ef] px-2.5 py-[11px] text-[#374151]">{project?.variants?.[1]?.strategy?.angle ?? <span className="text-[#c4c8d3]">--</span>}</td></tr>
+                  <tr><td className="border border-[#e4e7ef] px-2.5 py-[11px] text-[#374151]">Hook</td><td className="border border-[#e4e7ef] px-2.5 py-[11px] text-[#374151]">{project?.variants?.[0]?.selectedHook?.text ?? <span className="text-[#c4c8d3]">--</span>}</td><td className="border border-[#e4e7ef] px-2.5 py-[11px] text-[#374151]">{project?.variants?.[1]?.selectedHook?.text ?? <span className="text-[#c4c8d3]">--</span>}</td></tr>
+                  <tr><td className="border border-[#e4e7ef] px-2.5 py-[11px] text-[#374151]">Aspect ratio</td><td className="border border-[#e4e7ef] px-2.5 py-[11px] text-[#374151]">{payload.brief.aspectRatio}</td><td className="border border-[#e4e7ef] px-2.5 py-[11px] text-[#374151]">{payload.brief.aspectRatio}</td></tr>
+                  <tr><td className="border border-[#e4e7ef] px-2.5 py-[11px] text-[#374151]">Publishable score</td><td className="border border-[#e4e7ef] px-2.5 py-[11px]"><strong className={project?.variants?.[0]?.score ? "text-emerald-600" : "text-[#c4c8d3]"}>{project?.variants?.[0]?.score?.publishableScore ?? "--"} /100</strong></td><td className="border border-[#e4e7ef] px-2.5 py-[11px]"><strong className={project?.variants?.[1]?.score ? "text-emerald-600" : "text-[#c4c8d3]"}>{project?.variants?.[1]?.score?.publishableScore ?? "--"} /100</strong></td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            {/* Editor Feedback */}
+            <div className="rounded-2xl border border-[#e4e7ef] bg-white p-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-[17px] font-extrabold">Editor Feedback</h2>
+                <div className="flex items-center gap-2 text-xs text-[#6b7280]">
+                  Apply to
+                  <button type="button" className="h-7 w-[34px] rounded-[7px] border border-[#e4e7ef] bg-white font-bold">A</button>
+                  <button type="button" className="h-7 w-[34px] rounded-[7px] border border-[#e4e7ef] bg-white font-bold">B</button>
+                  <button type="button" className="h-7 rounded-[7px] bg-orange-500 px-2.5 font-bold text-white border-orange-500">Both</button>
+                </div>
+              </div>
+              <div className="mt-3 grid grid-cols-[1fr_190px] gap-3.5">
+                <div>
+                  <textarea className={`${inputCls} min-h-[112px] resize-none`} placeholder="Share feedback or change requests (e.g., shorter hook, different CTA, highlight ingredient X)..." />
+                  <button type="button" className="mt-3 w-full rounded-[9px] bg-orange-500 py-2.5 text-sm font-extrabold text-white hover:bg-orange-600 transition disabled:opacity-50 disabled:cursor-not-allowed" disabled={!project?.variants?.length}>&#8635; Regenerate Affected Parts</button>
+                </div>
+                <div className="rounded-[10px] border border-[#e4e7ef] bg-[#fbfbfd] p-3 text-xs text-[#4b5563]">
+                  <div className="mb-2 font-extrabold text-[#111827]">Revision Plan (Preview)</div>
+                  {project?.revisionPlan?.length ? (
+                    <ul className="mb-3 list-disc space-y-1 pl-4 leading-relaxed">
+                      {project.revisionPlan.map((revItem, i) => <li key={i}>{revItem.target}: {revItem.action}</li>)}
+                    </ul>
+                  ) : (
+                    <p className="mb-3 text-[#9ca3af]">Revision plan will appear here after feedback is submitted.</p>
+                  )}
+                  <span className="text-[#6b7280]">Est. time: ~2-3 min</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Export Package - always show, buttons dimmed when no data */}
+          <div className="mt-3.5 grid grid-cols-[260px_1fr] items-center gap-4 rounded-2xl border border-[#e4e7ef] bg-white p-4">
             <div>
-              <h2 className="text-xl font-semibold text-slate-900">Outputs</h2>
-              <p className="text-sm text-slate-500">
-                Hiện UI output da co 2 nhom: revision plan va export bundle.
-              </p>
+              <h2 className="text-[17px] font-extrabold">Export Package</h2>
+              <p className="mt-1 text-xs text-[#6b7280]">Download your assets and share or publish.</p>
             </div>
-            <div className="grid grid-cols-2 gap-3 sm:min-w-[280px]">
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Revision</div>
-                <div className="mt-1 text-lg font-semibold text-slate-900">
-                  {project?.revisionPlan?.length ?? 0}
+            {(() => {
+              const hasExports = Boolean(project?.exports?.length);
+              const btnCls = hasExports
+                ? "flex h-[38px] items-center justify-center rounded-lg border border-[#d7dceb] bg-white text-xs font-bold text-[#374151]"
+                : "flex h-[38px] items-center justify-center rounded-lg border border-[#d7dceb] bg-white text-xs font-bold text-[#c4c8d3] cursor-not-allowed opacity-50";
+              const zipCls = hasExports
+                ? "flex h-[38px] items-center justify-center rounded-lg bg-orange-500 text-xs font-bold text-white"
+                : "flex h-[38px] items-center justify-center rounded-lg bg-orange-500 text-xs font-bold text-white opacity-40 cursor-not-allowed";
+              return (
+                <div className="grid grid-cols-5 gap-2.5">
+                  <button type="button" disabled={!hasExports} className={btnCls}>&#8681; Download A</button>
+                  <button type="button" disabled={!hasExports} className={btnCls}>&#8681; Download B</button>
+                  <button type="button" disabled={!hasExports} className={btnCls}>&#9638; Download Cover</button>
+                  <button type="button" disabled={!hasExports} className={btnCls}>CC Download Caption</button>
+                  <button type="button" disabled={!hasExports} className={zipCls}>Download ZIP</button>
                 </div>
-              </div>
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Exports</div>
-                <div className="mt-1 text-lg font-semibold text-slate-900">
-                  {project?.exports?.length ?? 0}
-                </div>
-              </div>
-            </div>
+              );
+            })()}
           </div>
-
-          <div className="mt-4 grid gap-4 lg:grid-cols-2">
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <div className="text-xs uppercase tracking-[0.18em] text-slate-400">
-                Revision plan
-              </div>
-              {project?.revisionPlan?.length ? (
-                <ul className="mt-3 space-y-2 text-sm text-slate-700">
-                  {project.revisionPlan.map((item, index) => (
-                    <li
-                      key={`${item.target}-${item.action}-${index}`}
-                      className="rounded-xl border border-slate-200 bg-white px-3 py-2"
-                    >
-                      <div className="font-medium text-slate-900">
-                        {item.target} → {item.action}
-                      </div>
-                      <div className="mt-1 text-xs text-slate-400">
-                        {item.sceneId ? `Scene: ${item.sceneId}` : null}
-                        {item.sceneId && item.segmentId ? " · " : null}
-                        {item.segmentId ? `Segment: ${item.segmentId}` : null}
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <div className="mt-3 rounded-xl border border-dashed border-slate-200 bg-white px-4 py-5 text-sm text-slate-400">
-                  Chua co revision plan tren UI. Phan nay da co khung hien thi, nhung du lieu se
-                  xuat hien sau khi workflow chay xong.
-                </div>
-              )}
-            </div>
-
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <div className="text-xs uppercase tracking-[0.18em] text-slate-400">
-                Export bundle
-              </div>
-              {project?.exports?.length ? (
-                <ul className="mt-3 space-y-2 text-sm text-slate-700">
-                  {project.exports.map((item) => (
-                    <li
-                      key={`${item.type}-${item.path}`}
-                      className="rounded-xl border border-slate-200 bg-white px-3 py-2"
-                    >
-                      <div className="font-medium text-slate-900">{item.label}</div>
-                      <div className="mt-1 text-xs text-slate-400">
-                        {truncate(item.path, 88)}
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <div className="mt-3 rounded-xl border border-dashed border-slate-200 bg-white px-4 py-5 text-sm text-slate-400">
-                  Chua co export bundle tren UI. Hien tai phan output da du khung metadata, nhung
-                  chua co nut download hay preview file thuc te.
-                </div>
-              )}
-            </div>
-          </div>
-        </article>
+        </div>
       </section>
     </div>
   );

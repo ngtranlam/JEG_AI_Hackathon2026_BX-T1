@@ -7,6 +7,7 @@ export const PROJECT_GENERATION_JOB_NAME = "run-project-generation";
 
 export interface ProjectGenerationJobData {
   projectId: string;
+  startFromNode?: string;
 }
 
 let projectGenerationQueue: Queue<ProjectGenerationJobData> | undefined;
@@ -46,7 +47,9 @@ export async function enqueueProjectGeneration(input: ProjectGenerationJobData) 
   const queue = getProjectGenerationQueue();
 
   return queue.add(PROJECT_GENERATION_JOB_NAME, input, {
-    jobId: input.projectId,
+    jobId: input.startFromNode
+      ? `${input.projectId}:${input.startFromNode}:${Date.now()}`
+      : input.projectId,
   });
 }
 

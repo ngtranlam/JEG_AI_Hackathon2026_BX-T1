@@ -240,7 +240,7 @@ export const coverCaptionTitleGeneratorNode: WorkflowNode = {
                 "#ShortFormVideo",
               ],
               coverText: variant?.selectedHook?.text ?? title,
-              ctaWording: projectState.brief.callToAction,
+              ctaWording: projectState.brief.callToAction ?? "",
             },
           ];
         }),
@@ -255,7 +255,7 @@ export const coverCaptionTitleGeneratorNode: WorkflowNode = {
         const caption = generated?.caption ?? `${title}\nCTA: ${projectState.brief.callToAction}.`;
         const hashtags =
           generated?.hashtags ?? [`#${projectState.brief.brandName.replace(/\s+/g, "")}`, "#ShortFormVideo"];
-        const primaryCallToAction = generated?.ctaWording ?? projectState.brief.callToAction;
+        const primaryCallToAction = generated?.ctaWording ?? projectState.brief.callToAction ?? "";
         const { coverPath, captionPath } = await createPublishingArtifacts({
           projectId: projectState.projectId,
           variantId: variant.id,

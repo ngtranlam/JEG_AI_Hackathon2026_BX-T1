@@ -28,7 +28,7 @@ export const briefSchema = z.object({
   brandTone: z.string().min(1),
   mainMessage: z.string().default(""),
   complianceConstraints: z.string().default(""),
-  callToAction: z.string().min(1),
+  callToAction: z.string().optional().default(""),
   objective: z.string().min(1).optional(),
   offer: z.string().min(1).optional(),
   mandatoryClaims: z.array(z.string().min(1)).optional(),

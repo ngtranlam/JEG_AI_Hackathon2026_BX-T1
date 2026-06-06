@@ -8,6 +8,9 @@
     "start": "next start",
     "lint": "eslint .",
     "worker": "tsx workers/project-generation-worker.ts",
+    "cleanup": "bash scripts/cleanup.sh",
+    "predev": "bash scripts/cleanup.sh",
+    "postdev": "bash scripts/cleanup.sh",
     "prisma:generate": "prisma generate",
     "prisma:migrate:dev": "prisma migrate dev",
     "prisma:studio": "prisma studio"

@@ -77,6 +77,7 @@ export async function runProjectWorkflow(
   projectState: ProjectState,
   options?: {
     onStateChange?: WorkflowStateListener;
+    startFromNode?: WorkflowNodeId;
   },
 ) {
   const notifyStateChange = async (state: ProjectState) => {
@@ -87,7 +88,15 @@ export async function runProjectWorkflow(
   let nextState = setProjectStatus(projectState, "running");
   await notifyStateChange(nextState);
 
-  for (const node of ACTIVE_WORKFLOW_NODES) {
+  const startNodeId = options?.startFromNode;
+  const startIndex = startNodeId
+    ? ACTIVE_WORKFLOW_NODES.findIndex((n) => n.id === startNodeId)
+    : 0;
+  const nodesToRun = startIndex > 0
+    ? ACTIVE_WORKFLOW_NODES.slice(startIndex)
+    : ACTIVE_WORKFLOW_NODES;
+
+  for (const node of nodesToRun) {
     const workflowNodeContext: WorkflowNodeContext = {
       onStateChange: async (state) => {
         nextState = state;

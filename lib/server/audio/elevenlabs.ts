@@ -28,7 +28,7 @@ export type GenerateVoiceoverOutput = {
 const DEFAULT_ELEVENLABS_MODEL_ID = "eleven_v3";
 
 export function getConfiguredElevenLabsVoiceId() {
-  return env.ELEVENLABS_VOICE_ID;
+  return "CeNX9CMwmxDxUF5Q2Inm";
 }
 
 export function getConfiguredElevenLabsModelId() {
