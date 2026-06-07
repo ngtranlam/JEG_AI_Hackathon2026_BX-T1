@@ -96,7 +96,15 @@ export async function runProjectWorkflow(
     ? ACTIVE_WORKFLOW_NODES.slice(startIndex)
     : ACTIVE_WORKFLOW_NODES;
 
+  const voiceDisabledNodes = new Set<WorkflowNodeId>(["voiceover-generator", "subtitle-burn-in-agent"]);
+
   for (const node of nodesToRun) {
+    if (!nextState.brief.enableVoice && voiceDisabledNodes.has(node.id)) {
+      nextState = markNodeSkipped(nextState, node.id, "Skipped: voice disabled by user.");
+      await notifyStateChange(nextState);
+      continue;
+    }
+
     const workflowNodeContext: WorkflowNodeContext = {
       onStateChange: async (state) => {
         nextState = state;

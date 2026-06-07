@@ -27,8 +27,16 @@ export type GenerateVoiceoverOutput = {
 
 const DEFAULT_ELEVENLABS_MODEL_ID = "eleven_v3";
 
-export function getConfiguredElevenLabsVoiceId() {
-  return "CeNX9CMwmxDxUF5Q2Inm";
+const VOICE_IDS = {
+  male: "876MHA6EtWKaHTEGzjy5",
+  female: "sScFwemjGrAkDDiTXWMH",
+  default: "CeNX9CMwmxDxUF5Q2Inm",
+};
+
+export function getConfiguredElevenLabsVoiceId(gender?: "male" | "female") {
+  if (gender === "male") return VOICE_IDS.male;
+  if (gender === "female") return VOICE_IDS.female;
+  return VOICE_IDS.default;
 }
 
 export function getConfiguredElevenLabsModelId() {

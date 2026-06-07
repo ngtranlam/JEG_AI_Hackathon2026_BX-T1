@@ -1,5 +1,5 @@
 import { buildArtifactPath } from "@/lib/server/storage/artifacts";
-import { concatVideos } from "@/lib/server/media/ffmpeg";
+import { concatVideos, mixBackgroundMusic, probeMediaFile } from "@/lib/server/media/ffmpeg";
 import { writeTextArtifact } from "@/lib/server/storage/files";
 import { appendNodeLog } from "@/lib/server/state/project-state";
 import type { ProjectState, VariantArtifact } from "@/lib/types/project";
@@ -70,6 +70,26 @@ export const videoStitchingAgentNode: WorkflowNode = {
             path: draftVideoPath,
           },
         ];
+
+        const backgroundMusicPath = projectState.brandKit.backgroundMusicPath;
+        if (
+          !projectState.brief.enableVoice &&
+          backgroundMusicPath &&
+          (await probeMediaFile(backgroundMusicPath))
+        ) {
+          const musicMixPath = buildArtifactPath({
+            projectId: projectState.projectId,
+            variantId: variant.id,
+            nodeId: "video-stitching-agent",
+            fileName: isSquare ? `${variant.id}_draft_bgm_1x1.mp4` : `${variant.id}_draft_bgm_9x16.mp4`,
+          });
+          await mixBackgroundMusic(draftVideoPath, backgroundMusicPath, musicMixPath);
+          nextArtifacts.push({
+            kind: "voiceover-mixed-video",
+            label: `${variant.id} draft with BGM`,
+            path: musicMixPath,
+          });
+        }
 
         return {
           ...variant,

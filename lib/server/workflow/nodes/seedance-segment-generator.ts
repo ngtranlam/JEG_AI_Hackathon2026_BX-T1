@@ -158,8 +158,6 @@ export const seedanceSegmentGeneratorNode: WorkflowNode = {
     const aspectRatio = projectState.brief.aspectRatio;
     const downgradedSegments: string[] = [];
     let nextState = projectState;
-    let previousLastFrameUrl: string | undefined;
-
     for (const variant of nextState.variants) {
       for (const segment of variant.segmentPlan ?? []) {
         const requestedGenerationMode = segment.generationMode ?? "T2V";
@@ -184,23 +182,26 @@ export const seedanceSegmentGeneratorNode: WorkflowNode = {
         );
         await context?.onStateChange?.(nextState);
 
+        const basePrompt = (segment.promptSummary ?? "").trim();
+        const promptWithAudioHint = basePrompt
+          ? `${basePrompt}. Ambient sound effects that match the scene, no background music.`
+          : "Ambient sound effects that match the scene, no background music.";
+
         const result = await createSeedanceTask({
           projectId: nextState.projectId,
           variantId: variant.id,
           segmentId: segment.id,
-          prompt: segment.promptSummary ?? "",
+          prompt: promptWithAudioHint,
           durationSeconds: segment.durationSeconds,
           generationMode: effectiveGenerationMode,
           aspectRatio,
           firstFrameUrl:
-            effectiveGenerationMode === "I2V" ? (previousLastFrameUrl ?? referenceImageUrl) : undefined,
+            effectiveGenerationMode === "I2V" ? referenceImageUrl : undefined,
           referenceImageUrls:
             effectiveGenerationMode === "R2V" ? referenceImageUrls : undefined,
           generateAudio: true,
           resolution: nextState.brief.resolution,
         });
-
-        previousLastFrameUrl = result.lastFrameUrl;
 
         nextState = updateSegmentState(
           nextState,

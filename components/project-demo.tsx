@@ -42,6 +42,8 @@ const EMPTY_PAYLOAD: CreateProjectPayload = {
     mainMessage: "",
     complianceConstraints: "",
     callToAction: "",
+    enableVoice: true,
+    voiceGender: "female" as const,
   },
   brandKit: {
     assets: [],
@@ -581,6 +583,21 @@ export function ProjectDemo() {
     }
   }
 
+  async function handleMusicUpload(file: File | null) {
+    if (!file) return;
+    setError(null);
+    try {
+      const formData = new FormData();
+      formData.set("file", file);
+      const response = await fetch("/api/uploads/audio", { method: "POST", body: formData });
+      const data = (await response.json()) as { filePath?: string; fileName?: string; error?: string };
+      if (!response.ok) throw new Error(data.error ?? "Failed to upload audio.");
+      updateBrandKit("backgroundMusicPath", data.filePath);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to upload audio.");
+    }
+  }
+
   async function handleAssetUpload(type: BrandAsset["type"], file: File | null) {
     if (!file) return;
 
@@ -858,6 +875,70 @@ export function ProjectDemo() {
           );
         })()}
 
+        {/* Voice toggle */}
+        <div className="mb-3.5 rounded-[10px] border border-[#e4e7ef] bg-white px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-xs font-extrabold">Voiceover &amp; subtitles</div>
+              <div className="text-[11px] text-[#6b7280]">Generate voice narration and burn subtitles</div>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={(payload.brief.enableVoice ?? true)}
+              disabled={busy}
+              onClick={() => updateBrief("enableVoice", !(payload.brief.enableVoice ?? true))}
+              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none disabled:opacity-40 ${(payload.brief.enableVoice ?? true) ? "bg-orange-500" : "bg-[#d1d5db]"}`}
+            >
+              <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${(payload.brief.enableVoice ?? true) ? "translate-x-5" : "translate-x-0"}`} />
+            </button>
+          </div>
+          {(payload.brief.enableVoice ?? true) && (
+            <div className="mt-3 border-t border-[#f3f4f6] pt-3">
+              <div className="mb-2 text-[11px] font-bold text-[#374151]">Voice gender <span className="text-rose-500">*</span></div>
+              <div className="grid grid-cols-2 gap-2">
+                {(["male", "female"] as const).map((g) => (
+                  <button
+                    key={g}
+                    type="button"
+                    disabled={busy}
+                    onClick={() => updateBrief("voiceGender", g)}
+                    className={`rounded-[8px] border px-3 py-2 text-xs font-bold transition ${
+                      payload.brief.voiceGender === g
+                        ? "border-orange-500 bg-orange-50 text-orange-600"
+                        : "border-[#e4e7ef] bg-white text-[#374151] hover:border-orange-300"
+                    } disabled:opacity-40`}
+                  >
+                    {g === "male" ? "👨 Nam" : "👩 Nữ"}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Background music upload */}
+        <div className="mb-2 text-xs font-extrabold">Background music <span className="font-medium text-[#6b7280]">(optional)</span></div>
+        {payload.brandKit.backgroundMusicPath ? (
+          <div className="mb-4 flex items-center gap-3 rounded-[10px] border border-[#e4e7ef] bg-white p-2">
+            <span className="text-2xl">🎵</span>
+            <div className="flex-1 min-w-0">
+              <strong className="block truncate text-xs text-[#4b5563]">{payload.brandKit.backgroundMusicPath.split("/").pop()}</strong>
+              <small className="text-[#9ca3af]">Will mix at 30% volume over video audio</small>
+            </div>
+            <button type="button" className="rounded-md bg-[#f3f4f6] px-2 py-1 text-[11px] font-medium text-[#374151] hover:bg-[#e5e7eb]" onClick={() => updateBrandKit("backgroundMusicPath", undefined)}>Remove</button>
+          </div>
+        ) : (
+          <label className="mb-4 flex h-[52px] cursor-pointer items-center justify-center gap-3 rounded-[10px] border border-dashed border-[#cbd2e1] bg-white text-center text-[#6b7280]">
+            <span className="text-xl">🎵</span>
+            <div>
+              <strong className="block text-xs text-[#4b5563]">Upload background music (optional)</strong>
+              <small className="text-[#9ca3af]">MP3, WAV, AAC — loops to fit video length</small>
+            </div>
+            <input type="file" accept="audio/*" className="hidden" onChange={(e) => { const file = e.currentTarget.files?.[0] ?? null; void handleMusicUpload(file); e.currentTarget.value = ""; }} disabled={busy} />
+          </label>
+        )}
+
         {error && <div className="mb-4 rounded-[10px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>}
 
         {/* Action buttons */}
@@ -943,34 +1024,63 @@ export function ProjectDemo() {
                   </div>
                 </div>
                 {nodeRun.errorMessage && <div className="mb-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-rose-700">{nodeRun.errorMessage}</div>}
-                {resultLines.length > 0 && <ul className="mb-2 space-y-1">{resultLines.map((l, i) => <li key={i}>{l}</li>)}</ul>}
-                {nodeRun.logs.length > 0 && <ul className="space-y-1 text-[#6b7280]">{nodeRun.logs.map((l, i) => <li key={i}>{l}</li>)}</ul>}
+                {expandedNode !== "seedance-segment-generator" && resultLines.length > 0 && <ul className="mb-2 space-y-1">{resultLines.map((l, i) => <li key={i}>{l}</li>)}</ul>}
+                {expandedNode !== "seedance-segment-generator" && nodeRun.logs.length > 0 && <ul className="space-y-1 text-[#6b7280]">{nodeRun.logs.map((l, i) => <li key={i}>{l}</li>)}</ul>}
                 
                 {/* Seedance Clips Video Preview Grid */}
                 {expandedNode === "seedance-segment-generator" && project?.variants && (
-                  <div className="mt-3 space-y-3">
+                  <div className="mt-3 space-y-4">
                     {project.variants.map((variant) => {
-                      const segments = (variant.segmentPlan ?? []).filter((seg) => seg.rawVideoPath);
+                      const segments = variant.segmentPlan ?? [];
                       if (segments.length === 0) return null;
                       
                       return (
                         <div key={variant.id}>
                           <div className="mb-2 font-bold text-[#111827]">Variant {variant.id}</div>
-                          <div className="grid grid-cols-6 gap-1.5">
-                            {segments.map((segment) => (
-                              <div key={segment.id} className="rounded border border-[#e4e7ef] bg-white p-1">
-                                <div className="mb-0.5 text-[8px] font-bold text-[#6b7280]">{segment.id}</div>
-                                <video 
-                                  src={`/api/outputs/${segment.rawVideoPath?.split("outputs/generated/")[1] ?? segment.rawVideoPath}`} 
-                                  className="w-full rounded bg-[#111827]" 
-                                  controls 
-                                  muted
-                                  preload="metadata"
-                                  style={{ aspectRatio: payload.brief.aspectRatio === "1:1" ? "1/1" : "9/16", maxHeight: "80px" }}
-                                />
-                                <div className="mt-0.5 text-[8px] text-[#9ca3af]">{segment.durationSeconds}s</div>
-                              </div>
-                            ))}
+                          <div className="grid grid-cols-3 gap-2.5">
+                            {segments.map((segment) => {
+                              const isGenerating = segment.status === "generating";
+                              const hasVideo = Boolean(segment.rawVideoPath);
+                              
+                              return (
+                                <div key={segment.id} className="relative rounded-lg border border-[#e4e7ef] bg-white p-2">
+                                  <div className="mb-1.5 flex items-center justify-between">
+                                    <div className="text-[10px] font-bold text-[#6b7280]">{segment.id}</div>
+                                    <div className="text-[10px] text-[#9ca3af]">{segment.durationSeconds}s</div>
+                                  </div>
+                                  {hasVideo ? (
+                                    <video 
+                                      src={`/api/outputs/${segment.rawVideoPath?.split("outputs/generated/")[1] ?? segment.rawVideoPath}`} 
+                                      className="w-full rounded bg-[#111827]" 
+                                      controls 
+                                      muted
+                                      preload="metadata"
+                                      style={{ aspectRatio: payload.brief.aspectRatio === "1:1" ? "1/1" : "9/16" }}
+                                    />
+                                  ) : (
+                                    <div 
+                                      className="relative w-full overflow-hidden rounded bg-gradient-to-br from-[#f3f4f6] to-[#e5e7eb]"
+                                      style={{ aspectRatio: payload.brief.aspectRatio === "1:1" ? "1/1" : "9/16" }}
+                                    >
+                                      {isGenerating && (
+                                        <>
+                                          <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-orange-100/40 to-orange-200/40" />
+                                          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-[#9ca3af]">
+                                            <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#e5e7eb] border-t-orange-500" />
+                                            <div className="text-[10px] font-bold">Generating...</div>
+                                          </div>
+                                        </>
+                                      )}
+                                      {!isGenerating && (
+                                        <div className="absolute inset-0 flex items-center justify-center text-[10px] text-[#9ca3af]">
+                                          Pending
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
                       );

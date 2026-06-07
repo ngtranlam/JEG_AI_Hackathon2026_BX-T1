@@ -98,9 +98,10 @@ export const exportPackagerNode: WorkflowNode = {
 
     const nextVariants = await Promise.all(
       projectState.variants.map(async (variant) => {
-        const finalVideoPath = variant.artifacts.find(
-          (artifact) => artifact.kind === "final-video",
-        )?.path;
+        const finalVideoPath =
+          variant.artifacts.find((a) => a.kind === "final-video")?.path ??
+          variant.artifacts.find((a) => a.kind === "voiceover-mixed-video")?.path ??
+          variant.artifacts.find((a) => a.kind === "draft-video")?.path;
 
         const isSquare = projectState.brief.aspectRatio === "1:1";
 

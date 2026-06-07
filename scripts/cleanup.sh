@@ -8,11 +8,11 @@ if [ -d ".next" ]; then
   echo "✓ Removed .next cache"
 fi
 
-# Remove Prisma database
-if [ -f "prisma/dev.db" ]; then
-  rm -f prisma/dev.db prisma/dev.db-journal
-  echo "✓ Removed Prisma database"
-fi
+# Remove Prisma database (DISABLED - preserving data)
+# if [ -f "prisma/dev.db" ]; then
+#   rm -f prisma/dev.db prisma/dev.db-journal
+#   echo "✓ Removed Prisma database"
+# fi
 
 # Flush Redis
 if command -v redis-cli &> /dev/null; then

@@ -29,6 +29,8 @@ export const briefSchema = z.object({
   mainMessage: z.string().default(""),
   complianceConstraints: z.string().default(""),
   callToAction: z.string().optional().default(""),
+  enableVoice: z.boolean().optional().default(true),
+  voiceGender: z.enum(["male", "female"]).optional(),
   objective: z.string().min(1).optional(),
   offer: z.string().min(1).optional(),
   mandatoryClaims: z.array(z.string().min(1)).optional(),
@@ -44,6 +46,7 @@ export const brandKitSchema = z.object({
   visualNotes: z.array(z.string().min(1)).optional(),
   forbiddenWords: z.array(z.string().min(1)).optional(),
   assets: z.array(brandAssetSchema).default([]),
+  backgroundMusicPath: z.string().min(1).optional(),
 });
 
 export const createProjectRequestSchema = z.object({

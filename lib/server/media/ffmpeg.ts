@@ -150,7 +150,7 @@ export async function createSquareVideo(inputPath: string, outputPath: string) {
     "-i",
     inputPath,
     "-vf",
-    "scale=iw:iw:force_original_aspect_ratio=decrease,pad=iw:iw:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1",
+    "scale=1080:1080:force_original_aspect_ratio=decrease,pad=1080:1080:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1",
     "-c:v",
     "libx264",
     "-pix_fmt",
@@ -174,6 +174,34 @@ export async function createVerticalVideo(inputPath: string, outputPath: string)
     "libx264",
     "-pix_fmt",
     "yuv420p",
+    "-c:a",
+    "aac",
+    "-shortest",
+    outputPath,
+  ]);
+}
+
+export async function mixBackgroundMusic(
+  videoPath: string,
+  musicPath: string,
+  outputPath: string,
+  musicVolume = 0.3,
+) {
+  await ensureParentDir(outputPath);
+  await runProcess("ffmpeg", [
+    "-y",
+    "-i",
+    videoPath,
+    "-i",
+    musicPath,
+    "-filter_complex",
+    `[1:a]aloop=loop=-1:size=2e+09,volume=${musicVolume}[music];[0:a][music]amix=inputs=2:duration=first:dropout_transition=2[aout]`,
+    "-map",
+    "0:v:0",
+    "-map",
+    "[aout]",
+    "-c:v",
+    "copy",
     "-c:a",
     "aac",
     "-shortest",

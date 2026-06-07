@@ -4,7 +4,7 @@ import {
   getConfiguredElevenLabsVoiceId,
   hasElevenLabsRuntimeConfig,
 } from "@/lib/server/audio/elevenlabs";
-import { mixVoiceoverWithVideo, probeMediaFile } from "@/lib/server/media/ffmpeg";
+import { mixBackgroundMusic, mixVoiceoverWithVideo, probeMediaFile } from "@/lib/server/media/ffmpeg";
 import { buildArtifactPath } from "@/lib/server/storage/artifacts";
 import { writeTextArtifact } from "@/lib/server/storage/files";
 import { appendNodeLog } from "@/lib/server/state/project-state";
@@ -27,7 +27,7 @@ function buildAudioStrategyPayload(projectState: ProjectState, variantId: string
     provider: "elevenlabs" as const,
     mode: "voiceover_audio_strategy_agent" as const,
     defaultMode: "narration_voiceover" as const,
-    voiceId: getConfiguredElevenLabsVoiceId() ?? "ELEVENLABS_VOICE_ID",
+    voiceId: getConfiguredElevenLabsVoiceId(projectState.brief.voiceGender) ?? "ELEVENLABS_VOICE_ID",
     toneOfVoice: projectState.brief.brandTone,
     targetDuration: projectState.brief.targetDuration,
     segments: segmentPlan.map((segment) => ({
@@ -173,7 +173,19 @@ export const voiceoverGeneratorNode: WorkflowNode = {
         (await probeMediaFile(voiceoverPath));
 
       if (canMixVoiceover) {
-        await mixVoiceoverWithVideo(draftVideoPath as string, voiceoverPath, mixedVideoPath);
+        const backgroundMusicPath = projectState.brandKit.backgroundMusicPath;
+        if (backgroundMusicPath && (await probeMediaFile(backgroundMusicPath))) {
+          const withVoicePath = mixedVideoPath.replace(".mp4", "_vox.mp4");
+          await mixVoiceoverWithVideo(draftVideoPath as string, voiceoverPath, withVoicePath);
+          await mixBackgroundMusic(withVoicePath, backgroundMusicPath, mixedVideoPath);
+        } else {
+          await mixVoiceoverWithVideo(draftVideoPath as string, voiceoverPath, mixedVideoPath);
+        }
+      } else if (draftVideoPath && (await probeMediaFile(draftVideoPath as string))) {
+        const backgroundMusicPath = projectState.brandKit.backgroundMusicPath;
+        if (backgroundMusicPath && (await probeMediaFile(backgroundMusicPath))) {
+          await mixBackgroundMusic(draftVideoPath as string, backgroundMusicPath, mixedVideoPath);
+        }
       }
 
       const nextArtifacts: VariantArtifact[] = [

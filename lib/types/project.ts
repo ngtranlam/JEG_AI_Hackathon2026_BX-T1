@@ -64,6 +64,8 @@ export interface Brief {
   mainMessage: string;
   complianceConstraints: string;
   callToAction?: string;
+  enableVoice?: boolean;
+  voiceGender?: "male" | "female";
   objective?: string;
   offer?: string;
   mandatoryClaims?: string[];
@@ -87,6 +89,7 @@ export interface BrandKit {
   visualNotes?: string[];
   forbiddenWords?: string[];
   assets: BrandAsset[];
+  backgroundMusicPath?: string;
 }
 
 export interface BriefAnalysis {
