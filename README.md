@@ -18,170 +18,317 @@
 
 ## ✨ Overview
 
-BX-T1 is an agentic content factory orchestrated by TRAE for short-form video production. From a single creative brief, the system generates two publish-ready content variants for TikTok, Reels, or Shorts in under 60 minutes, with a target of at least 80% editor-rated publishability.
+BX-T1 is an AI-powered content factory that transforms a single creative brief into two publish-ready short-form video variants for TikTok, Instagram Reels, or YouTube Shorts. The system orchestrates multiple AI agents to handle script generation, video creation, voiceover, subtitles, and export packaging automatically.
 
-## 😵 Problem
-
-Creating a 60-second TikTok video can take creators between 8 and 20 hours. Designers, editors, and copywriters become bottlenecks whenever teams need to test multiple hooks or creative directions. General-purpose AI tools often fail to match brand identity or platform-specific conventions.
-
-## 🎯 Target Users
-
-- Solo creators
-- In-house content teams with 5-20 members
-- SME marketing managers in Southeast Asia
-- Focus industries: e-commerce, F&B, and service businesses
-
-## 🛠️ Mission
-
-Build an end-to-end content production workflow powered by TRAE:
-
-- Input brief
-- Generate multiple hook variants
-- Produce full scripts
-- Create storyboard frames
-- Define A-roll and B-roll plans
-- Generate voiceover
-- Burn in subtitles
-- Produce cover art
-- Generate titles and captions
-- Export platform-ready video cuts
-
-Each brief must produce at least two measurable creative directions for A/B testing.
-
-## 📥 Inputs
-
-- Creative brief: topic, brand tone, audience, platform, and hard constraints such as duration, claims, and compliance
-- Brand kit: logo, color palette, fonts, and product imagery
-- Optional moodboard or references
-
-## 📤 Expected Outputs
-
-- At least one publish-ready 15-30 second video for TikTok, Reels, or Shorts
-- Two creative variants from one brief
-- Export formats in 9:16 and at minimum 1:1
-- A reusable TRAE workflow that judges can duplicate and run
-
-## ✅ Mandatory Requirements
-
-- Seedance 2.0 is required for video generation
-- Support T2V, I2V, or R2V generation flow
-- Seed 2.0 via ModelArk is optional for script, hook, caption, and title A/B generation
-- TRAE orchestration must be clearly visible in the workflow
-- End-to-end goal: brief to two variants in under 60 minutes
-
-## 🧰 Suggested Tech Stack
-
-- Seedance 2.0
-- Seed 2.0 (ModelArk)
-- TRAE
-- ElevenLabs or another TTS engine for voiceover
-- Whisper plus subtitle burn-in pipeline
-
-## 🎬 Sample Use Cases
-
-1. F&B brief to generate two 20-second variants:
-   - Emotional storytelling
-   - Product-led demo
-   - Output for TikTok and Reels
-2. Skincare brief to generate hook variants A/B/C and promote the winning version into a full video
-3. Changing one input variable, such as audience from "Gen Z" to "Millennial mom", should produce a meaningful creative shift
-
-## 🏆 Evaluation Criteria
-
-- Clean pipeline from brief to content plan to production to final video
-- Consistent style and tone across variants
-- Fast revision loop
-- At least 80% of editors rate the output as publishable
-- Strong workflow reusability
-
-## 💡 Core Value Proposition
-
-- One brief in
-- Two creative directions out
-- Publish-ready short-form video production
-- Faster experimentation with measurable A/B testing
-- Better brand and platform alignment than generic AI tools
-
-## 📦 Repository Goal
-
-This repository is intended to host the BX-T1 workflow, assets, automation logic, and reusable orchestration templates for the hackathon submission sponsored by BytePlus and TRAE.
-
-## 🚦 Quick Start (Local)
+## 🚀 Installation & Setup
 
 ### Prerequisites
 
-- Node.js 20+
-- Redis (for BullMQ)
-- FFmpeg (required later for the media pipeline)
+- **Node.js** 20+ 
+- **Redis** (for job queue management)
+- **FFmpeg** (for video processing)
+- **Git** (for version control)
 
-### Setup
+### 1. Clone Repository
+
+```bash
+git clone https://github.com/ngtranlam/JEG_AI_Hackathon2026_BX-T1.git
+cd JEG_AI_Hackathon2026_BX-T1
+```
+
+### 2. Install Dependencies
 
 ```bash
 npm install
-cp .env.example .env
-npx prisma generate
-npx prisma migrate dev
 ```
 
-### Run (3 terminals)
+### 3. Environment Configuration
 
-Terminal 1: Redis
+Create `.env.local` file from example:
 
+```bash
+cp .env.example .env.local
+```
+
+**Required API Keys:**
+
+```env
+# ModelArk (Seedance 2.0 video generation)
+MODELARK_API_KEY=your_modelark_api_key
+MODELARK_BASE_URL=https://ark.cn-beijing.volces.com/api/v3
+
+# Seed 2.0 (AI text generation)
+SEED_API_KEY=your_seed_api_key
+SEED_BASE_URL=https://ark.cn-beijing.volces.com/api/v3
+
+# ElevenLabs (Voiceover generation)
+ELEVENLABS_API_KEY=your_elevenlabs_api_key
+
+# Database
+DATABASE_URL=file:./dev.db
+
+# Redis
+REDIS_URL=redis://localhost:6379
+```
+
+### 4. Database Setup
+
+```bash
+# Generate Prisma client
+npx prisma generate
+
+# Push schema to database
+npx prisma db push
+```
+
+### 5. Start Services
+
+**Terminal 1 - Redis Server:**
 ```bash
 redis-server
 ```
 
-Terminal 2: Worker (BullMQ consumer)
-
+**Terminal 2 - Background Worker:**
 ```bash
 npm run worker
 ```
 
-Terminal 3: Web app
-
+**Terminal 3 - Web Application:**
 ```bash
 npm run dev
 ```
 
-Open: http://localhost:3000
+Open browser: **http://localhost:3000**
 
-### Demo Flow (MVP)
+---
 
-1. Choose an example preset (F&B or Skincare).
-2. Click "Create project".
-3. Click "Enqueue generation".
-4. Watch node-by-node status updates and logs.
-5. Review Variant A/B strategy + selected hook + script beats.
+## 📋 Complete Workflow Guide
 
-## 🧪 API Smoke Test
+### Workflow Overview
 
-Create a project:
+The system executes **14 sequential nodes** to transform a brief into publish-ready videos:
+
+1. **Input Validator** - Validates brief and brand kit
+2. **Brief Analyzer** - Analyzes audience, value proposition, objectives
+3. **Brand DNA Extractor** - Extracts brand colors from logo
+4. **Hook Generator** - Generates 3 hook variants (A, B, C)
+5. **Hook Selector** - Selects best 2 hooks for variants
+6. **Script Writer** - Writes full scripts with narration
+7. **Segment Planner** - Plans video segments with timing
+8. **Seedance Prompt Builder** - Builds visual prompts for each segment
+9. **Seedance Segment Generator** - Generates video clips via Seedance 2.0
+10. **Segment Normalizer** - Normalizes video format/quality
+11. **Video Stitching Agent** - Concatenates segments into draft video
+12. **Voiceover Generator** - Generates voiceover with ElevenLabs (optional)
+13. **Subtitle Burn-in Agent** - Burns subtitles into video (optional)
+14. **Export Packager** - Creates 1:1 and 9:16 exports with metadata
+
+---
+
+## 🎬 Step-by-Step Usage
+
+### Step 1: Fill Project Brief
+
+**Required Fields:**
+- **Brand Name**: Your brand/product name
+- **Product Name**: Specific product being promoted
+- **Product Description**: Key features and benefits
+- **Target Audience**: Who you're targeting (e.g., "Gen Z coffee lovers")
+- **Platform**: TikTok / Instagram Reels / YouTube Shorts (single choice)
+- **Duration**: 15s / 20s / 30s
+- **Aspect Ratio**: 9:16 (vertical) or 1:1 (square)
+- **Brand Tone**: Voice and personality (e.g., "Fun, energetic, youthful")
+- **Main Message**: Core message to communicate
+- **Compliance Constraints**: Any legal/regulatory requirements
+
+**Optional Fields:**
+- **Call to Action**: e.g., "Shop now", "Learn more"
+- **Offer**: Special promotion or discount
+- **Mandatory Claims**: Must-include statements
+- **Prohibited Claims**: Avoid these statements
+
+### Step 2: Upload Brand Assets
+
+**Product Images (1-4 required):**
+- Upload 1-4 product photos
+- Used as reference for video generation
+- Best: high-quality, well-lit product shots
+
+**Optional Logo:**
+- PNG, JPG, or SVG
+- System extracts brand colors automatically
+
+**Optional Moodboard:**
+- Visual reference for style/composition
+- PNG, JPG, or PDF
+
+### Step 3: Configure Audio Settings
+
+**Voiceover & Subtitles (Toggle):**
+- **ON**: Generate AI voiceover + burn subtitles
+  - **Voice Gender**: Choose Male (👨 Nam) or Female (👩 Nữ)
+  - Male Voice ID: `876MHA6EtWKaHTEGzjy5`
+  - Female Voice ID: `sScFwemjGrAkDDiTXWMH`
+- **OFF**: Skip voiceover and subtitle generation
+
+**Background Music (Optional):**
+- Upload MP3, WAV, or AAC file
+- Music loops automatically to fit video length
+- Mixes at 30% volume over original video audio
+- Does NOT replace video sound effects
+
+### Step 4: Generate Videos
+
+1. Click **"Generate"** button
+2. System creates project and starts workflow
+3. Monitor progress in **"Workflow Progress"** section
+4. Each node shows:
+   - ⏳ Running (orange spinner)
+   - ✓ Completed (green checkmark)
+   - ✗ Failed (red indicator)
+
+**Estimated Time:** 5-15 minutes depending on video length and complexity
+
+### Step 5: Review Generated Variants
+
+**Variant A & B Cards:**
+- Preview final video with controls
+- View script, hook, and segment breakdown
+- Check publishability score (if available)
+
+**Seedance Clips Preview:**
+- Click on **"Seedance Segment Generator"** node
+- View all video segments in 3-column grid
+- See generating status with skeleton loader
+- Preview individual clips before final assembly
+
+### Step 6: Download Exports
+
+**Available Formats:**
+- **9:16 Vertical** - Original aspect ratio
+- **1:1 Square** - For Instagram feed posts
+- **Prompts.txt** - All AI prompts used
+- **Workflow Report** - Generation metadata
+
+**Export Location:** `outputs/generated/{projectId}/`
+
+---
+
+## 🔧 Advanced Features
+
+### Re-run from Specific Node
+
+1. Expand any completed node in workflow
+2. Click **"▶ Run again"** button
+3. Workflow restarts from that node onwards
+4. Useful for:
+   - Regenerating videos with different settings
+   - Fixing failed nodes
+   - Testing prompt variations
+
+### Manual Database Reset
+
+If you need to clear all projects:
 
 ```bash
-curl -sS -X POST http://localhost:3000/api/projects \\
-  -H 'content-type: application/json' \\
-  -d @examples/fnb-project.json | jq
+rm -f prisma/dev.db
+npx prisma db push
 ```
 
-Enqueue generation:
+### Audio Upload API
 
+Background music uploads are handled via:
+```
+POST /api/uploads/audio
+```
+
+Accepts: MP3, WAV, OGG, AAC, M4A  
+Returns: `{ filePath, fileName }`
+
+---
+
+## 🐛 Troubleshooting
+
+### "Table 'main.Project' does not exist"
+
+**Solution:**
 ```bash
-PROJECT_ID="<replace-with-id>"
-curl -sS -X POST http://localhost:3000/api/projects/$PROJECT_ID/generate | jq
+npx prisma db push
+# Restart dev server
 ```
 
-Fetch project state:
+### Redis Connection Error
 
+**Solution:**
 ```bash
-curl -sS http://localhost:3000/api/projects/$PROJECT_ID | jq
+# Check if Redis is running
+redis-cli ping
+# Should return: PONG
+
+# If not running:
+redis-server
 ```
 
-## 🧩 Notes
+### FFmpeg Not Found
 
-- Current MVP focuses on visible workflow orchestration and text-planning nodes.
-- Seedance 2.0 via ModelArk is now wired for real generation when the required env vars are present.
-- ElevenLabs is now wired for real narration voiceover generation when the required env vars are present.
-- FFmpeg now normalizes segments, stitches draft videos, mixes real voiceover audio, burns ASS subtitles, and exports a real 1:1 video cut.
-- Local image upload is supported and can be used as the I2V reference image for Seedance.
-- Remaining placeholder outputs are limited to generated captions/hashtags logic and the workflow report metadata, not the core video/audio pipeline.
-- Seedance may reject uploaded reference images that appear to contain a real person, so product-only or graphic reference images are recommended for stable demo runs.
+**macOS:**
+```bash
+brew install ffmpeg
+```
+
+**Ubuntu/Debian:**
+```bash
+sudo apt-get install ffmpeg
+```
+
+### Seedance Generation Fails
+
+**Common causes:**
+- Invalid API key
+- Reference image contains human faces (use product-only images)
+- Network timeout (retry the node)
+
+---
+
+## 📁 Project Structure
+
+```
+├── app/                    # Next.js app router
+│   ├── api/               # API routes
+│   │   ├── projects/      # Project CRUD
+│   │   └── uploads/       # File upload handlers
+│   └── page.tsx           # Main UI
+├── components/            # React components
+│   └── project-demo.tsx   # Main workflow interface
+├── lib/
+│   ├── server/
+│   │   ├── workflow/      # Workflow orchestration
+│   │   │   └── nodes/     # Individual workflow nodes
+│   │   ├── media/         # FFmpeg video processing
+│   │   ├── audio/         # ElevenLabs integration
+│   │   └── modelark/      # Seedance API client
+│   └── types/             # TypeScript types
+├── workers/               # Background job processors
+├── prisma/                # Database schema
+└── outputs/               # Generated videos
+```
+
+---
+
+## 🎯 Key Technologies
+
+- **Next.js 15** - Web framework
+- **Prisma** - Database ORM
+- **BullMQ** - Job queue
+- **Redis** - Queue storage
+- **FFmpeg** - Video processing
+- **Seedance 2.0** - AI video generation
+- **Seed 2.0** - AI text generation
+- **ElevenLabs** - AI voiceover
+- **TypeScript** - Type safety
+
+---
+
+## 📝 License
+
+MIT License - See LICENSE file for details
