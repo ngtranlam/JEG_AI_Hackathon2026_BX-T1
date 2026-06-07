@@ -327,8 +327,3 @@ sudo apt-get install ffmpeg
 - **ElevenLabs** - AI voiceover
 - **TypeScript** - Type safety
 
----
-
-## 📝 License
-
-MIT License - See LICENSE file for details
